@@ -1,0 +1,13 @@
+{
+  "name": "hypercord",
+  "private": true,
+  "packageManager": "pnpm@latest",
+  "workspaces": ["apps/*","packages/*"],
+  "scripts": {
+    "build": "pnpm -w apps/bot run build",
+    "dev": "pnpm -w apps/bot run dev",
+    "lint": "pnpm -w apps/bot run lint",
+    "test": "pnpm -w apps/bot run test",
+    "format": "pnpm -w apps/bot run format"
+  }
+}
