@@ -12,11 +12,14 @@
     "lint": "pnpm -F @hypercord/bot run lint",
     "test": "pnpm -F @hypercord/bot run test",
     "format": "pnpm -F @hypercord/bot run format",
+    "format:write": "pnpm -F @hypercord/bot run format:write",
     "bot:db": "pnpm -F @hypercord/bot run db:dev",
     "bot:register": "pnpm -F @hypercord/bot run register",
     "bot:dev": "pnpm -F @hypercord/bot run dev",
     "bot:build": "pnpm -F @hypercord/bot run build",
     "bot:up": "docker compose -f apps/bot/docker-compose.yaml up -d",
-    "bot:down": "docker compose -f apps/bot/docker-compose.yaml down"
+    "bot:down": "docker compose -f apps/bot/docker-compose.yaml down",
+    "bot:dev:hot": "pnpm -F @hypercord/bot run dev:hot",
+    "bot:up-all": "pnpm run bot:up && pnpm run bot:db && pnpm run bot:dev:hot"
   }
 }
