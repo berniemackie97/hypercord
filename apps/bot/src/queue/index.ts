@@ -4,8 +4,10 @@ import IORedis from "ioredis";
 import { type Client, type GuildTextBasedChannel } from "discord.js";
 import { env } from "../core/config.js";
 import { db } from "../db/index.js";
-import { reminders } from "../db/schema.js";
-import { eq } from "drizzle-orm";
+import { reminders, commandLogs, guilds, guildMembers, dailyStats } from "../db/schema.js";
+import { eq, sql, and, gte, lt } from "drizzle-orm";
+import { nanoid } from "nanoid";
+import { log } from "../core/logger.js";
 
 const connection = new IORedis(env.REDIS_URL, {
   maxRetriesPerRequest: null, // BullMQ requirement
@@ -15,6 +17,7 @@ const connection = new IORedis(env.REDIS_URL, {
 export const queues = {
   example:   new Queue("example",   { connection }),
   reminders: new Queue("reminders", { connection }),
+  dailyStats: new Queue("dailyStats", { connection }),
 };
 
 function isGuildTextSendable(ch: unknown): ch is GuildTextBasedChannel {
@@ -77,6 +80,97 @@ export function startWorkers(client: Client) {
           .where(eq(reminders.id, reminderId));
       } catch (err) {
         console.error("Failed to mark reminder as completed:", err);
+      }
+    },
+    { connection },
+  );
+
+  // Daily stats aggregation worker
+  new Worker(
+    "dailyStats",
+    async (job) => {
+      const { date }: { date: string } = job.data;
+      const targetDate = new Date(date);
+      const startOfDay = new Date(targetDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(targetDate);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      try {
+        // Count commands executed and failed
+        const commandStats = await db
+          .select({
+            executed: sql<number>`COUNT(*)`,
+            failed: sql<number>`SUM(CASE WHEN ${commandLogs.success} = false THEN 1 ELSE 0 END)`,
+          })
+          .from(commandLogs)
+          .where(
+            and(
+              gte(commandLogs.createdAt, startOfDay),
+              lt(commandLogs.createdAt, endOfDay)
+            )
+          );
+
+        // Count active guilds (guilds with commands executed that day)
+        const activeGuildsCount = await db
+          .selectDistinct({ guildId: commandLogs.guildId })
+          .from(commandLogs)
+          .where(
+            and(
+              gte(commandLogs.createdAt, startOfDay),
+              lt(commandLogs.createdAt, endOfDay)
+            )
+          );
+
+        // Count active users (users who executed commands that day)
+        const activeUsersCount = await db
+          .selectDistinct({ userId: commandLogs.userId })
+          .from(commandLogs)
+          .where(
+            and(
+              gte(commandLogs.createdAt, startOfDay),
+              lt(commandLogs.createdAt, endOfDay)
+            )
+          );
+
+        const stats = commandStats[0] || { executed: 0, failed: 0 };
+
+        // Insert daily stats
+        await db
+          .insert(dailyStats)
+          .values({
+            id: nanoid(),
+            date: targetDate,
+            commandsExecuted: Number(stats.executed) || 0,
+            commandsFailed: Number(stats.failed) || 0,
+            guildsActive: activeGuildsCount.length,
+            usersActive: activeUsersCount.length,
+            messagesProcessed: 0, // Can be tracked separately if needed
+          })
+          .onConflictDoUpdate({
+            target: dailyStats.date,
+            set: {
+              commandsExecuted: Number(stats.executed) || 0,
+              commandsFailed: Number(stats.failed) || 0,
+              guildsActive: activeGuildsCount.length,
+              usersActive: activeUsersCount.length,
+              updatedAt: new Date(),
+            },
+          });
+
+        log.info(
+          {
+            date: date,
+            commandsExecuted: stats.executed,
+            commandsFailed: stats.failed,
+            guildsActive: activeGuildsCount.length,
+            usersActive: activeUsersCount.length,
+          },
+          "daily stats aggregated"
+        );
+      } catch (err) {
+        log.error({ err, date }, "failed to aggregate daily stats");
+        throw err;
       }
     },
     { connection },

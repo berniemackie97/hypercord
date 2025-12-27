@@ -5,9 +5,15 @@ dist/
 .env
 .env.local
 
+# Testing
+coverage/
+.nyc_output/
+*.lcov
+
 # Editor
 .vscode/
 .idea/
+.claude/
 
 # OS
 .DS_Store
@@ -15,3 +21,8 @@ dist/
 # Database
 /apps/bot/*.db
 /apps/bot/*.db-journal
+
+# Build artifacts
+.turbo/
+.next/
+out/

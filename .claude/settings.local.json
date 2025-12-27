@@ -17,7 +17,8 @@
       "Bash(npx pnpm run test)",
       "Bash(npx pnpm run:*)",
       "Bash(npm run test:coverage:*)",
-      "Bash(npx pnpm:*)"
+      "Bash(npx pnpm:*)",
+      "Bash(git rm:*)"
     ]
   }
 }

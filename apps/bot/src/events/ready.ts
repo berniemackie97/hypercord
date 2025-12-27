@@ -2,6 +2,7 @@ import { Events, type Client } from "discord.js";
 import { db } from "../db/index.js";
 import { guilds } from "../db/schema.js";
 import { log } from "../core/logger.js";
+import { queues } from "../queue/index.js";
 
 export const name = Events.ClientReady;
 export const once = true;
@@ -37,5 +38,24 @@ export async function execute(client: Client) {
     }
   } catch (err) {
     log.error({ err }, "failed to sync guilds on startup");
+  }
+
+  // Schedule daily stats aggregation
+  try {
+    // Schedule for midnight every day (using cron pattern)
+    await queues.dailyStats.add(
+      "aggregate",
+      { date: new Date().toISOString().split("T")[0] },
+      {
+        repeat: {
+          pattern: "0 0 * * *", // Every day at midnight
+        },
+        jobId: "daily-stats-aggregation", // Prevents duplicates
+      }
+    );
+
+    log.info("scheduled daily stats aggregation");
+  } catch (err) {
+    log.error({ err }, "failed to schedule daily stats aggregation");
   }
 }
