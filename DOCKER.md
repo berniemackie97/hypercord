@@ -134,9 +134,13 @@ docker-compose down --rmi all
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `BOT_TOKEN` | ✅ | - | Discord bot token |
-| `APPLICATION_ID` | ✅ | - | Discord application ID |
+| `CLIENT_ID` | ✅ | - | Discord application ID |
 | `DATABASE_URL` | ✅ | - | PostgreSQL connection string |
 | `REDIS_URL` | ✅ | - | Redis connection string |
+| `GEMINI_API_KEY` | ❌ | - | Google Gemini API (FREE unlimited) |
+| `OPENAI_API_KEY` | ❌ | - | OpenAI GPT API |
+| `ANTHROPIC_API_KEY` | ❌ | - | Anthropic Claude API |
+| `GROK_API_KEY` | ❌ | - | Grok AI API |
 | `NODE_ENV` | ❌ | `development` | Environment mode |
 | `LOG_LEVEL` | ❌ | `info` | Logging level |
 | `ADMIN_USER_IDS` | ❌ | - | Comma-separated admin user IDs |
