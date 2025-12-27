@@ -362,6 +362,120 @@ export const levelRewards = pgTable(
 );
 
 // ============================================
+// Social & Engagement Tables
+// ============================================
+
+export const giveaways = pgTable(
+  "giveaways",
+  {
+    id: text("id").primaryKey(),
+    guildId: text("guild_id")
+      .notNull()
+      .references(() => guilds.id, { onDelete: "cascade" }),
+    channelId: text("channel_id").notNull(),
+    messageId: text("message_id").notNull(),
+    hostId: text("host_id").notNull(),
+    prize: text("prize").notNull(),
+    winnersCount: integer("winners_count").default(1).notNull(),
+    endsAt: timestamp("ends_at").notNull(),
+    ended: boolean("ended").default(false).notNull(),
+    winnerIds: jsonb("winner_ids"),
+    requirements: jsonb("requirements"), // role requirements, level requirements, etc
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    guildIdx: index("giveaways_guild_id_idx").on(table.guildId),
+    endedIdx: index("giveaways_ended_idx").on(table.ended),
+    endsAtIdx: index("giveaways_ends_at_idx").on(table.endsAt),
+  })
+);
+
+export const inventory = pgTable(
+  "inventory",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    guildId: text("guild_id")
+      .notNull()
+      .references(() => guilds.id, { onDelete: "cascade" }),
+    itemId: text("item_id").notNull(),
+    quantity: integer("quantity").default(1).notNull(),
+    metadata: jsonb("metadata"),
+    acquiredAt: timestamp("acquired_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    userGuildIdx: index("inventory_user_guild_idx").on(table.userId, table.guildId),
+    itemIdx: index("inventory_item_id_idx").on(table.itemId),
+  })
+);
+
+export const shopItems = pgTable(
+  "shop_items",
+  {
+    id: text("id").primaryKey(),
+    guildId: text("guild_id")
+      .notNull()
+      .references(() => guilds.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    description: text("description"),
+    type: text("type").notNull(), // role, item, consumable
+    price: integer("price").notNull(),
+    roleId: text("role_id"), // if type is role
+    stock: integer("stock"), // null = unlimited
+    emoji: text("emoji"),
+    metadata: jsonb("metadata"),
+    enabled: boolean("enabled").default(true).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    guildIdx: index("shop_items_guild_id_idx").on(table.guildId),
+    typeIdx: index("shop_items_type_idx").on(table.type),
+  })
+);
+
+export const afkStatus = pgTable(
+  "afk_status",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    guildId: text("guild_id")
+      .notNull()
+      .references(() => guilds.id, { onDelete: "cascade" }),
+    reason: text("reason"),
+    setAt: timestamp("set_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    userGuildIdx: index("afk_status_user_guild_idx").on(table.userId, table.guildId),
+  })
+);
+
+export const messageCache = pgTable(
+  "message_cache",
+  {
+    id: text("id").primaryKey(),
+    messageId: text("message_id").notNull(),
+    channelId: text("channel_id").notNull(),
+    guildId: text("guild_id"),
+    authorId: text("author_id").notNull(),
+    content: text("content"),
+    attachments: jsonb("attachments"),
+    editedContent: text("edited_content"),
+    deletedAt: timestamp("deleted_at"),
+    editedAt: timestamp("edited_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    channelIdx: index("message_cache_channel_idx").on(table.channelId),
+    authorIdx: index("message_cache_author_idx").on(table.authorId),
+    deletedIdx: index("message_cache_deleted_idx").on(table.deletedAt),
+  })
+);
+
+// ============================================
 // Analytics Tables
 // ============================================
 
@@ -475,6 +589,24 @@ export const levelRewardsRelations = relations(levelRewards, ({ one }) => ({
   guild: one(guilds, { fields: [levelRewards.guildId], references: [guilds.id] }),
 }));
 
+export const giveawaysRelations = relations(giveaways, ({ one }) => ({
+  guild: one(guilds, { fields: [giveaways.guildId], references: [guilds.id] }),
+}));
+
+export const inventoryRelations = relations(inventory, ({ one }) => ({
+  user: one(users, { fields: [inventory.userId], references: [users.id] }),
+  guild: one(guilds, { fields: [inventory.guildId], references: [guilds.id] }),
+}));
+
+export const shopItemsRelations = relations(shopItems, ({ one }) => ({
+  guild: one(guilds, { fields: [shopItems.guildId], references: [guilds.id] }),
+}));
+
+export const afkStatusRelations = relations(afkStatus, ({ one }) => ({
+  user: one(users, { fields: [afkStatus.userId], references: [users.id] }),
+  guild: one(guilds, { fields: [afkStatus.guildId], references: [guilds.id] }),
+}));
+
 // ============================================
 // Type exports
 // ============================================
@@ -526,3 +658,18 @@ export type NewLevel = typeof levels.$inferInsert;
 
 export type LevelReward = typeof levelRewards.$inferSelect;
 export type NewLevelReward = typeof levelRewards.$inferInsert;
+
+export type Giveaway = typeof giveaways.$inferSelect;
+export type NewGiveaway = typeof giveaways.$inferInsert;
+
+export type Inventory = typeof inventory.$inferSelect;
+export type NewInventory = typeof inventory.$inferInsert;
+
+export type ShopItem = typeof shopItems.$inferSelect;
+export type NewShopItem = typeof shopItems.$inferInsert;
+
+export type AfkStatus = typeof afkStatus.$inferSelect;
+export type NewAfkStatus = typeof afkStatus.$inferInsert;
+
+export type MessageCache = typeof messageCache.$inferSelect;
+export type NewMessageCache = typeof messageCache.$inferInsert;

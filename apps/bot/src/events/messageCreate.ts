@@ -3,6 +3,10 @@ import { log } from "../core/logger.js";
 import { getGuildConfig } from "../core/guildConfig.js";
 import { createAuditLog } from "../core/audit.js";
 import { addXP, calculateMessageXP } from "../utils/leveling.js";
+import { db } from "../db/index.js";
+import { messageCache, afkStatus } from "../db/schema.js";
+import { nanoid } from "nanoid";
+import { eq, and } from "drizzle-orm";
 
 export const name = Events.MessageCreate;
 export const once = false;
@@ -54,6 +58,21 @@ setInterval(() => {
 export async function execute(message: Message) {
   // Ignore bots and DMs
   if (message.author.bot || !message.guild) return;
+
+  // Cache message for snipe command (non-blocking)
+  cacheMessage(message).catch((err) => {
+    log.error({ err, guild: message.guild?.id, messageId: message.id }, "failed to cache message");
+  });
+
+  // Check and clear AFK status (non-blocking)
+  handleAFKStatus(message).catch((err) => {
+    log.error({ err, guild: message.guild?.id, user: message.author.id }, "failed to handle AFK status");
+  });
+
+  // Check for AFK mentions (non-blocking)
+  handleAFKMentions(message).catch((err) => {
+    log.error({ err, guild: message.guild?.id, messageId: message.id }, "failed to handle AFK mentions");
+  });
 
   // Handle XP gain (non-blocking)
   handleXPGain(message).catch((err) => {
@@ -246,3 +265,104 @@ setInterval(() => {
     }
   }
 }, 300000); // Every 5 minutes
+
+/**
+ * Cache message for snipe command
+ */
+async function cacheMessage(message: Message) {
+  if (!message.guild) return;
+
+  // Limit cache to 100 messages per channel (delete oldest)
+  const existing = await db
+    .select({ id: messageCache.id })
+    .from(messageCache)
+    .where(eq(messageCache.channelId, message.channelId))
+    .orderBy(messageCache.createdAt)
+    .limit(100);
+
+  if (existing.length >= 100) {
+    // Delete oldest message
+    await db
+      .delete(messageCache)
+      .where(eq(messageCache.id, existing[0].id));
+  }
+
+  // Cache the message
+  await db.insert(messageCache).values({
+    id: nanoid(),
+    messageId: message.id,
+    channelId: message.channelId,
+    guildId: message.guild.id,
+    authorId: message.author.id,
+    content: message.content || null,
+    attachments: message.attachments.size > 0
+      ? message.attachments.map((a) => ({
+          id: a.id,
+          url: a.url,
+          name: a.name,
+          size: a.size,
+        }))
+      : null,
+  });
+}
+
+/**
+ * Handle AFK status - remove if user is AFK
+ */
+async function handleAFKStatus(message: Message) {
+  if (!message.guild) return;
+
+  const afk = await db.query.afkStatus.findFirst({
+    where: (a, { eq, and }) => and(
+      eq(a.userId, message.author.id),
+      eq(a.guildId, message.guild!.id)
+    ),
+  });
+
+  if (afk) {
+    await db
+      .delete(afkStatus)
+      .where(and(
+        eq(afkStatus.userId, message.author.id),
+        eq(afkStatus.guildId, message.guild.id)
+      ));
+
+    await message.reply({
+      content: `👋 Welcome back! Your AFK status has been removed.`,
+    }).catch(() => {});
+  }
+}
+
+/**
+ * Check for AFK mentions and notify
+ */
+async function handleAFKMentions(message: Message) {
+  if (!message.guild) return;
+  if (message.mentions.users.size === 0) return;
+
+  const afkUsers: string[] = [];
+
+  for (const [userId] of message.mentions.users) {
+    const afk = await db.query.afkStatus.findFirst({
+      where: (a, { eq, and }) => and(
+        eq(a.userId, userId),
+        eq(a.guildId, message.guild!.id)
+      ),
+    });
+
+    if (afk) {
+      const user = await message.client.users.fetch(userId).catch(() => null);
+      if (user) {
+        const reason = afk.reason ? ` - ${afk.reason}` : "";
+        afkUsers.push(`**${user.tag}** is currently AFK${reason}`);
+      }
+    }
+  }
+
+  if (afkUsers.length > 0) {
+    await message.reply({
+      content: afkUsers.join("\n"),
+      allowedMentions: { users: [] },
+    }).catch(() => {});
+  }
+}
