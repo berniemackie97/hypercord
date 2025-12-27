@@ -2,7 +2,7 @@
 // Drizzle Schema for Hypercord Discord Bot
 // ============================================
 
-import { pgTable, text, timestamp, boolean, integer, jsonb, date, index, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, integer, jsonb, date, index, unique, doublePrecision } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
 // ============================================
@@ -19,6 +19,10 @@ export const guilds = pgTable(
     leftAt: timestamp("left_at"),
     isActive: boolean("is_active").default(true).notNull(),
     config: jsonb("config").default({}).notNull(),
+    // AI Assistant defaults
+    defaultAiProvider: text("default_ai_provider", { enum: ["openai", "anthropic", "gemini", "grok", "disabled"] }).default("gemini"),
+    defaultAiModel: text("default_ai_model").default("gemini-1.5-flash"),
+    aiEnabled: boolean("ai_enabled").default(true).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -472,6 +476,98 @@ export const messageCache = pgTable(
     channelIdx: index("message_cache_channel_idx").on(table.channelId),
     authorIdx: index("message_cache_author_idx").on(table.authorId),
     deletedIdx: index("message_cache_deleted_idx").on(table.deletedAt),
+  })
+);
+
+// ============================================
+// AI Assistant Tables
+// ============================================
+
+export const aiChannelConfig = pgTable(
+  "ai_channel_config",
+  {
+    id: text("id").primaryKey(),
+    guildId: text("guild_id").notNull().references(() => guilds.id, { onDelete: "cascade" }),
+    channelId: text("channel_id").notNull(),
+    provider: text("provider", { enum: ["openai", "anthropic", "gemini", "grok"] }).notNull().default("gemini"),
+    model: text("model").notNull().default("gemini-1.5-flash"),
+    systemPrompt: text("system_prompt"),
+    rateLimit: integer("rate_limit").default(5).notNull(), // messages per minute
+    requiredRole: text("required_role"), // Optional role ID required to use AI
+    enabled: boolean("enabled").default(true).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    guildIdx: index("ai_channel_config_guild_idx").on(table.guildId),
+    channelIdx: index("ai_channel_config_channel_idx").on(table.channelId),
+    uniqueChannel: index("ai_channel_config_unique_channel_idx").on(table.guildId, table.channelId),
+  })
+);
+
+export const aiUserAccess = pgTable(
+  "ai_user_access",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull(),
+    guildId: text("guild_id").notNull().references(() => guilds.id, { onDelete: "cascade" }),
+    provider: text("provider", { enum: ["openai", "anthropic", "gemini", "grok"] }).notNull(),
+    model: text("model").notNull(),
+    monthlyLimit: integer("monthly_limit"), // null = unlimited
+    usedThisMonth: integer("used_this_month").default(0).notNull(),
+    expiresAt: timestamp("expires_at"), // null = never expires
+    grantedBy: text("granted_by").notNull(), // Admin who granted access
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    userGuildIdx: index("ai_user_access_user_guild_idx").on(table.userId, table.guildId),
+    expiresIdx: index("ai_user_access_expires_idx").on(table.expiresAt),
+  })
+);
+
+export const aiUsageLog = pgTable(
+  "ai_usage_log",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull(),
+    guildId: text("guild_id").notNull(),
+    channelId: text("channel_id").notNull(),
+    messageId: text("message_id").notNull(),
+    provider: text("provider").notNull(),
+    model: text("model").notNull(),
+    promptTokens: integer("prompt_tokens").notNull(),
+    completionTokens: integer("completion_tokens").notNull(),
+    totalTokens: integer("total_tokens").notNull(),
+    estimatedCost: doublePrecision("estimated_cost").notNull(), // in USD
+    responseTime: integer("response_time").notNull(), // milliseconds
+    success: boolean("success").default(true).notNull(),
+    error: text("error"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    guildIdx: index("ai_usage_log_guild_idx").on(table.guildId),
+    userIdx: index("ai_usage_log_user_idx").on(table.userId),
+    dateIdx: index("ai_usage_log_date_idx").on(table.createdAt),
+    providerIdx: index("ai_usage_log_provider_idx").on(table.provider),
+  })
+);
+
+export const aiQuotas = pgTable(
+  "ai_quotas",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull(),
+    guildId: text("guild_id").notNull().references(() => guilds.id, { onDelete: "cascade" }),
+    provider: text("provider").notNull(),
+    month: text("month").notNull(), // Format: YYYY-MM
+    messagesUsed: integer("messages_used").default(0).notNull(),
+    tokensUsed: integer("tokens_used").default(0).notNull(),
+    totalCost: doublePrecision("total_cost").default(0).notNull(),
+    lastReset: timestamp("last_reset").defaultNow().notNull(),
+  },
+  (table) => ({
+    userGuildProviderIdx: index("ai_quotas_user_guild_provider_idx").on(table.userId, table.guildId, table.provider),
+    monthIdx: index("ai_quotas_month_idx").on(table.month),
   })
 );
 

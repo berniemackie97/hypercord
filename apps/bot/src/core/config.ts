@@ -18,6 +18,12 @@ const envSchema = z.object({
   DATABASE_URL: z.string().min(1),
   REDIS_URL: z.string().min(1),
 
+  // AI API Keys (optional - only needed if using that provider)
+  OPENAI_API_KEY: z.string().optional(),
+  ANTHROPIC_API_KEY: z.string().optional(),
+  GEMINI_API_KEY: z.string().optional(),
+  GROK_API_KEY: z.string().optional(),
+
   // Optional allowlists for elevated commands
   ADMIN_USER_IDS: z.preprocess((v) => (typeof v === "string" ? v : ""), csv).optional(),
   ADMIN_ROLE_IDS: z.preprocess((v) => (typeof v === "string" ? v : ""), csv).optional(),

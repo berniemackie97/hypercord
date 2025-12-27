@@ -18,6 +18,7 @@ export const queues = {
   example:   new Queue("example",   { connection }),
   reminders: new Queue("reminders", { connection }),
   dailyStats: new Queue("dailyStats", { connection }),
+  aiQuotaReset: new Queue("ai-quota-reset", { connection }),
 };
 
 function isGuildTextSendable(ch: unknown): ch is GuildTextBasedChannel {
@@ -28,6 +29,42 @@ function isGuildTextSendable(ch: unknown): ch is GuildTextBasedChannel {
 }
 
 export function startWorkers(client: Client) {
+  // AI Quota Reset Worker
+  new Worker(
+    "ai-quota-reset",
+    async (job) => {
+      log.info("Starting monthly AI quota reset");
+
+      try {
+        const { aiUserAccess } = await import("../db/schema.js");
+        const result = await db
+          .update(aiUserAccess)
+          .set({ usedThisMonth: 0 })
+          .returning({ userId: aiUserAccess.userId });
+
+        log.info({ count: result.length }, "AI quotas reset for month");
+        return { success: true, usersReset: result.length };
+      } catch (error) {
+        log.error({ error }, "Failed to reset AI quotas");
+        throw error;
+      }
+    },
+    { connection }
+  );
+
+  // Schedule monthly AI quota reset (runs on 1st of month at midnight)
+  queues.aiQuotaReset.add(
+    "monthly-reset",
+    {},
+    {
+      repeat: {
+        pattern: "0 0 1 * *", // Cron: At 00:00 on day-of-month 1
+      },
+    }
+  ).then(() => {
+    log.info("AI quota reset job scheduled (monthly on 1st at midnight)");
+  });
+
   new Worker(
     "reminders",
     async (job) => {

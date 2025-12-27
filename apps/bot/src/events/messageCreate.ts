@@ -4,9 +4,10 @@ import { getGuildConfig } from "../core/guildConfig.js";
 import { createAuditLog } from "../core/audit.js";
 import { addXP, calculateMessageXP } from "../utils/leveling.js";
 import { db } from "../db/index.js";
-import { messageCache, afkStatus } from "../db/schema.js";
+import { messageCache, afkStatus, aiChannelConfig, aiUserAccess, guilds } from "../db/schema.js";
 import { nanoid } from "nanoid";
 import { eq, and } from "drizzle-orm";
+import { callAI, checkQuota, type AIConfig } from "../services/ai.js";
 
 export const name = Events.MessageCreate;
 export const once = false;
@@ -72,6 +73,11 @@ export async function execute(message: Message) {
   // Check for AFK mentions (non-blocking)
   handleAFKMentions(message).catch((err) => {
     log.error({ err, guild: message.guild?.id, messageId: message.id }, "failed to handle AFK mentions");
+  });
+
+  // Handle AI assistant mentions (non-blocking)
+  handleAIMention(message).catch((err) => {
+    log.error({ err, guild: message.guild?.id, messageId: message.id }, "failed to handle AI mention");
   });
 
   // Handle XP gain (non-blocking)
@@ -365,4 +371,162 @@ async function handleAFKMentions(message: Message) {
       allowedMentions: { users: [] },
     }).catch(() => {});
   }
+}
+
+/**
+ * Handle AI assistant mentions
+ */
+async function handleAIMention(message: Message) {
+  if (!message.guild) return;
+
+  // Check if bot was mentioned
+  if (!message.mentions.has(message.client.user!.id)) return;
+
+  // Get AI configuration priority: user > channel > guild default
+  const aiConfig = await resolveAIConfig(message);
+  if (!aiConfig) return; // AI disabled or not configured
+
+  // Check role requirements if set
+  if (aiConfig.requiredRole) {
+    const member = await message.guild.members.fetch(message.user.id).catch(() => null);
+    if (!member || !member.roles.cache.has(aiConfig.requiredRole)) {
+      await message.reply({
+        content: "❌ You don't have the required role to use AI in this channel.",
+        allowedMentions: { users: [] },
+      }).catch(() => {});
+      return;
+    }
+  }
+
+  // Check quota
+  const hasQuota = await checkQuota(message.author.id, message.guild.id, aiConfig.provider, aiConfig.monthlyLimit);
+  if (!hasQuota) {
+    await message.reply({
+      content: `❌ You've exceeded your monthly quota for ${aiConfig.provider}. Check \`/ai-quota\` for details.`,
+      allowedMentions: { users: [] },
+    }).catch(() => {});
+    return;
+  }
+
+  // Extract prompt (remove bot mention)
+  const prompt = message.content.replace(new RegExp(`<@!?${message.client.user!.id}>`), "").trim();
+  if (!prompt) {
+    await message.reply({
+      content: "Ask me anything! Just mention me with your question.",
+      allowedMentions: { users: [] },
+    }).catch(() => {});
+    return;
+  }
+
+  // Show typing indicator
+  await message.channel.sendTyping();
+
+  try {
+    // Call AI service
+    const response = await callAI(prompt, aiConfig, {
+      userId: message.author.id,
+      guildId: message.guild.id,
+      channelId: message.channelId,
+      messageId: message.id,
+    });
+
+    // Split response if too long (Discord limit: 2000 chars)
+    const chunks = splitMessage(response.content, 2000);
+
+    for (const chunk of chunks) {
+      await message.reply({
+        content: chunk,
+        allowedMentions: { users: [] },
+      });
+    }
+  } catch (error) {
+    log.error({ error, userId: message.author.id }, "AI response failed");
+    await message.reply({
+      content: "❌ Sorry, I encountered an error processing your request. Please try again later.",
+      allowedMentions: { users: [] },
+    }).catch(() => {});
+  }
+}
+
+/**
+ * Resolve AI configuration based on priority: user > channel > guild
+ */
+async function resolveAIConfig(message: Message): Promise<(AIConfig & { requiredRole?: string; monthlyLimit?: number | null }) | null> {
+  if (!message.guild) return null;
+
+  // 1. Check user-level access
+  const userAccess = await db.query.aiUserAccess.findFirst({
+    where: (a, { eq, and }) => and(eq(a.userId, message.author.id), eq(a.guildId, message.guild!.id)),
+  });
+
+  if (userAccess) {
+    // Check if expired
+    if (userAccess.expiresAt && userAccess.expiresAt < new Date()) {
+      // Expired, fall through to channel/guild config
+    } else {
+      return {
+        provider: userAccess.provider as "openai" | "anthropic" | "gemini" | "grok",
+        model: userAccess.model,
+        monthlyLimit: userAccess.monthlyLimit,
+      };
+    }
+  }
+
+  // 2. Check channel-level config
+  const channelConfig = await db.query.aiChannelConfig.findFirst({
+    where: (c, { eq, and }) => and(eq(c.guildId, message.guild!.id), eq(c.channelId, message.channelId), eq(c.enabled, true)),
+  });
+
+  if (channelConfig) {
+    return {
+      provider: channelConfig.provider as "openai" | "anthropic" | "gemini" | "grok",
+      model: channelConfig.model,
+      systemPrompt: channelConfig.systemPrompt || undefined,
+      requiredRole: channelConfig.requiredRole || undefined,
+    };
+  }
+
+  // 3. Fall back to guild default
+  const guild = await db.query.guilds.findFirst({
+    where: (g, { eq }) => eq(g.id, message.guild!.id),
+  });
+
+  if (guild && guild.aiEnabled && guild.defaultAiProvider !== "disabled") {
+    return {
+      provider: guild.defaultAiProvider as "openai" | "anthropic" | "gemini" | "grok",
+      model: guild.defaultAiModel || "gemini-1.5-flash",
+    };
+  }
+
+  // AI disabled
+  return null;
+}
+
+/**
+ * Split long messages into chunks
+ */
+function splitMessage(text: string, maxLength: number): string[] {
+  const chunks: string[] = [];
+  let remaining = text;
+
+  while (remaining.length > 0) {
+    if (remaining.length <= maxLength) {
+      chunks.push(remaining);
+      break;
+    }
+
+    // Find last newline or space before maxLength
+    let splitIndex = remaining.lastIndexOf("\n", maxLength);
+    if (splitIndex === -1) {
+      splitIndex = remaining.lastIndexOf(" ", maxLength);
+    }
+    if (splitIndex === -1) {
+      splitIndex = maxLength;
+    }
+
+    chunks.push(remaining.slice(0, splitIndex));
+    remaining = remaining.slice(splitIndex).trim();
+  }
+
+  return chunks;
 }
