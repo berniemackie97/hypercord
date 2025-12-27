@@ -1,18 +1,30 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Mock postgres and Redis globally to prevent loader from failing
-vi.mock("postgres", () => ({
-  default: vi.fn(() => {
-    const query = vi.fn().mockResolvedValue([{ "?column?": 1 }]);
-    query.end = vi.fn().mockResolvedValue(undefined);
-    return query;
-  }),
+// Mock the database module to prevent postgres connection errors
+vi.mock("../../db/index.js", () => ({
+  db: {},
+  schema: {},
+  checkDatabaseConnection: vi.fn().mockResolvedValue(true),
+  closeDatabaseConnection: vi.fn().mockResolvedValue(undefined),
 }));
 
+// Mock Redis
 vi.mock("ioredis", () => ({
   default: vi.fn(() => ({
     ping: vi.fn().mockResolvedValue("PONG"),
   })),
+}));
+
+// Mock BullMQ queues
+vi.mock("../../queue/index.js", () => ({
+  queues: {
+    reminders: {
+      add: vi.fn().mockResolvedValue({}),
+    },
+    dailyStats: {
+      add: vi.fn().mockResolvedValue({}),
+    },
+  },
 }));
 
 import { loadCommands, loadEvents } from "../loader.js";

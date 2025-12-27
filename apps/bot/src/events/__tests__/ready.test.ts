@@ -1,6 +1,28 @@
-import { describe, it, expect } from "vitest";
-import { name, once, execute } from "../ready.js";
+import { describe, it, expect, vi } from "vitest";
 import { Events } from "discord.js";
+
+// Mock the database module
+vi.mock("../../db/index.js", () => ({
+  db: {
+    insert: vi.fn(() => ({
+      values: vi.fn(() => ({
+        onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
+      })),
+    })),
+    raw: vi.fn((sql: string) => sql),
+  },
+}));
+
+// Mock the queue module
+vi.mock("../../queue/index.js", () => ({
+  queues: {
+    dailyStats: {
+      add: vi.fn().mockResolvedValue({}),
+    },
+  },
+}));
+
+import { name, once, execute } from "../ready.js";
 
 describe("Ready Event", () => {
   it("should have correct event name", () => {
@@ -19,6 +41,19 @@ describe("Ready Event", () => {
   it("should execute without errors", async () => {
     const mockClient: any = {
       user: { tag: "TestBot#0000" },
+      guilds: {
+        cache: new Map([
+          [
+            "123456789",
+            {
+              id: "123456789",
+              name: "Test Guild",
+              ownerId: "987654321",
+              joinedAt: new Date(),
+            },
+          ],
+        ]),
+      },
     };
 
     await expect(execute(mockClient)).resolves.toBeUndefined();

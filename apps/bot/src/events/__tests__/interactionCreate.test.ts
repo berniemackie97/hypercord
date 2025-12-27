@@ -1,6 +1,29 @@
 import { describe, it, expect, vi } from "vitest";
-import { name, once, execute } from "../interactionCreate.js";
 import { Events } from "discord.js";
+
+// Mock database module
+vi.mock("../../db/index.js", () => ({
+  db: {
+    insert: vi.fn(() => ({
+      values: vi.fn(() => ({
+        catch: vi.fn(),
+      })),
+    })),
+  },
+}));
+
+// Mock database utils
+vi.mock("../../db/utils.js", () => ({
+  ensureUser: vi.fn().mockResolvedValue({}),
+  ensureGuildMember: vi.fn().mockResolvedValue({}),
+}));
+
+// Mock nanoid
+vi.mock("nanoid", () => ({
+  nanoid: vi.fn(() => "test-id-123"),
+}));
+
+import { name, once, execute } from "../interactionCreate.js";
 import { commands } from "../../core/client.js";
 
 describe("InteractionCreate Event", () => {
@@ -45,6 +68,7 @@ describe("InteractionCreate Event", () => {
       commandName: "test-cmd-success",
       user: { id: "123" },
       guildId: "456",
+      options: { data: [] },
     };
 
     await execute(interaction);
@@ -65,6 +89,7 @@ describe("InteractionCreate Event", () => {
       commandName: "test-cmd-error",
       user: { id: "123" },
       guildId: "456",
+      options: { data: [] },
       deferred: false,
       replied: false,
       reply: vi.fn().mockResolvedValue({}),
