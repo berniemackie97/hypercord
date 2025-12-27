@@ -9,6 +9,9 @@ import { loggingMiddleware, guildOnlyMiddleware } from "../core/middleware.js";
 import { rateLimitMiddleware } from "../core/rateLimiter.js";
 import { validationMiddleware, getValidatedOptions } from "../core/validation.js";
 import { queues } from "../queue/index.js";
+import { db } from "../db/index.js";
+import { reminders } from "../db/schema.js";
+import { nanoid } from "nanoid";
 
 /**
  * Remind command - Schedule reminders with Redis-backed persistence
@@ -96,11 +99,24 @@ export const { data, execute } = createCommand(commandData)
     await interaction.deferReply({ ephemeral: true });
 
     const dueAt = Date.now() + delay;
+    const reminderId = nanoid();
+
+    // Save reminder to database
+    await db.insert(reminders).values({
+      id: reminderId,
+      userId: interaction.user.id,
+      guildId: interaction.guildId!,
+      channelId: interaction.channelId,
+      content: what,
+      scheduledFor: new Date(dueAt),
+      isCompleted: false,
+    });
 
     // Schedule reminder in Redis queue
     await queues.reminders.add(
       "remind",
       {
+        reminderId,
         guildId: interaction.guildId!,
         channelId: interaction.channelId,
         userId: interaction.user.id,

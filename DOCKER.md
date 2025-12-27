@@ -18,7 +18,7 @@ cp .env.example .env
 docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
 
 # 4. Run database migrations
-docker-compose exec bot pnpm prisma migrate dev
+docker-compose exec bot pnpm db:migrate
 
 # 5. Access admin tools:
 # - pgAdmin: http://localhost:5050 (admin@hypercord.local / admin)
@@ -62,7 +62,7 @@ docker-compose ps
 - Cached for faster rebuilds
 
 **Stage 2: Builder**
-- Generates Prisma Client
+- Generates Drizzle migrations
 - Builds TypeScript to JavaScript
 - Runs tsup bundler
 
@@ -84,20 +84,17 @@ docker-compose ps
 ### Database
 
 ```bash
-# Generate Prisma Client
-docker-compose exec bot pnpm prisma generate
+# Generate Drizzle migrations
+docker-compose exec bot pnpm db:generate
 
-# Create migration
-docker-compose exec bot pnpm prisma migrate dev --name migration_name
+# Apply migrations
+docker-compose exec bot pnpm db:migrate
 
-# Apply migrations (production)
-docker-compose exec bot pnpm prisma migrate deploy
+# Push schema changes (development)
+docker-compose exec bot pnpm db:push
 
-# Reset database (WARNING: Deletes all data)
-docker-compose exec bot pnpm prisma migrate reset
-
-# Open Prisma Studio
-docker-compose exec bot pnpm prisma studio
+# Open Drizzle Studio
+docker-compose exec bot pnpm db:studio
 ```
 
 ### Bot Management
@@ -169,7 +166,7 @@ docker-compose down --rmi all
 docker-compose logs bot
 
 # Check database connection
-docker-compose exec bot pnpm prisma db pull
+docker-compose exec postgres psql -U hypercord -d hypercord -c "SELECT 1"
 
 # Verify environment variables
 docker-compose exec bot env | grep -E 'BOT_TOKEN|DATABASE_URL|REDIS_URL'

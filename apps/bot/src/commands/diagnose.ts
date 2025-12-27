@@ -2,11 +2,13 @@ import { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } from "discord.
 import { createCommand } from "../core/commandBuilder.js";
 import { loggingMiddleware, permissionMiddleware, guildOnlyMiddleware } from "../core/middleware.js";
 import { rateLimitMiddleware } from "../core/rateLimiter.js";
-import { PrismaClient } from "@prisma/client";
+import { checkDatabaseConnection } from "../db/index.js";
 import IORedis from "ioredis";
+import postgres from "postgres";
+import { env } from "../core/config.js";
 
-const prisma = new PrismaClient();
-const redis = new IORedis(process.env.REDIS_URL!);
+const redis = new IORedis(env.REDIS_URL!);
+const queryClient = postgres(env.DATABASE_URL);
 
 /**
  * Diagnose command - System health checks for administrators
@@ -46,7 +48,7 @@ export const { data, execute } = createCommand(commandData)
     let okDb = false;
     try {
       const t0 = Date.now();
-      await prisma.$queryRaw`SELECT 1`;
+      await queryClient`SELECT 1`;
       dbMs = Date.now() - t0;
       okDb = true;
     } catch (error) {

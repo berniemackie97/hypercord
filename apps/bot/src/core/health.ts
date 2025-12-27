@@ -1,7 +1,7 @@
 import { client } from "./client.js";
 import { log } from "./logger.js";
-import { PrismaClient } from "@prisma/client";
-import { Redis } from "ioredis";
+import type { Sql } from "postgres";
+import type { Redis } from "ioredis";
 
 /**
  * Health check result
@@ -102,10 +102,10 @@ export class HealthManager {
   /**
    * Check database connection health
    */
-  async checkDatabase(prisma: PrismaClient): Promise<HealthCheckDetail> {
+  async checkDatabase(db: Sql): Promise<HealthCheckDetail> {
     try {
       const start = Date.now();
-      await prisma.$queryRaw`SELECT 1`;
+      await db`SELECT 1`;
       const latency = Date.now() - start;
 
       return {
@@ -144,10 +144,10 @@ export class HealthManager {
   /**
    * Perform full health check
    */
-  async getHealth(prisma: PrismaClient, redis: Redis): Promise<HealthCheck> {
+  async getHealth(db: Sql, redis: Redis): Promise<HealthCheck> {
     const [discord, database, redisCheck] = await Promise.all([
       this.checkDiscord(),
-      this.checkDatabase(prisma),
+      this.checkDatabase(db),
       this.checkRedis(redis),
     ]);
 
@@ -203,8 +203,8 @@ export class HealthManager {
   /**
    * Log health status
    */
-  async logHealth(prisma: PrismaClient, redis: Redis): Promise<void> {
-    const health = await this.getHealth(prisma, redis);
+  async logHealth(db: Sql, redis: Redis): Promise<void> {
+    const health = await this.getHealth(db, redis);
     const metrics = this.getMetrics();
 
     log.info(

@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Mock Prisma and Redis globally to prevent loader from failing
-vi.mock("@prisma/client", () => ({
-  PrismaClient: vi.fn(() => ({
-    $queryRaw: vi.fn().mockResolvedValue([{ "?column?": 1 }]),
-  })),
+// Mock postgres and Redis globally to prevent loader from failing
+vi.mock("postgres", () => ({
+  default: vi.fn(() => {
+    const query = vi.fn().mockResolvedValue([{ "?column?": 1 }]);
+    query.end = vi.fn().mockResolvedValue(undefined);
+    return query;
+  }),
 }));
 
 vi.mock("ioredis", () => ({

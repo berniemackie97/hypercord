@@ -8,6 +8,11 @@ import {
 } from "../core/middleware.js";
 import { rateLimitMiddleware } from "../core/rateLimiter.js";
 import { validationMiddleware, schemas, getValidatedOptions } from "../core/validation.js";
+import { db } from "../db/index.js";
+import { kicks } from "../db/schema.js";
+import { ensureUser } from "../db/utils.js";
+import { createAuditLog } from "../core/audit.js";
+import { nanoid } from "nanoid";
 
 /**
  * Kick command - Remove a member from the server
@@ -105,6 +110,29 @@ export const { data, execute } = createCommand(commandData)
 
     // Execute the kick
     await member.kick(reason || `Kicked by ${interaction.user.tag}`);
+
+    // Save kick to database and audit log
+    try {
+      await ensureUser(member.user);
+      await db.insert(kicks).values({
+        id: nanoid(),
+        userId: member.user.id,
+        guildId: guild.id,
+        moderatorId: interaction.user.id,
+        reason: reason || "No reason provided",
+      });
+
+      await createAuditLog({
+        guildId: guild.id,
+        moderatorId: interaction.user.id,
+        action: "kick",
+        targetId: member.user.id,
+        reason: reason,
+      });
+    } catch (err) {
+      // Log but don't fail the command if database insert fails
+      console.error("Failed to save kick to database:", err);
+    }
 
     const embed = new EmbedBuilder()
       .setTitle("👢 Member Kicked")

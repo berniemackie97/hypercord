@@ -3,6 +3,9 @@ import { Queue, Worker } from "bullmq";
 import IORedis from "ioredis";
 import { type Client, type GuildTextBasedChannel } from "discord.js";
 import { env } from "../core/config.js";
+import { db } from "../db/index.js";
+import { reminders } from "../db/schema.js";
+import { eq } from "drizzle-orm";
 
 const connection = new IORedis(env.REDIS_URL, {
   maxRetriesPerRequest: null, // BullMQ requirement
@@ -26,11 +29,13 @@ export function startWorkers(client: Client) {
     "reminders",
     async (job) => {
       const {
+        reminderId,
         channelId,
         userId,
         what,
         original,
       }: {
+        reminderId: string;
         channelId: string;
         userId: string;
         what: string;
@@ -59,6 +64,19 @@ export function startWorkers(client: Client) {
         }
       } catch {
         // best-effort cleanup only
+      }
+
+      // 3) mark reminder as completed in database
+      try {
+        await db
+          .update(reminders)
+          .set({
+            isCompleted: true,
+            completedAt: new Date(),
+          })
+          .where(eq(reminders.id, reminderId));
+      } catch (err) {
+        console.error("Failed to mark reminder as completed:", err);
       }
     },
     { connection },

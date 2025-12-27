@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { HealthManager } from "../health.js";
-import type { PrismaClient } from "@prisma/client";
+import type { Sql } from "postgres";
 import type { Redis } from "ioredis";
 
 describe("HealthManager", () => {
@@ -61,34 +61,28 @@ describe("HealthManager", () => {
 
   describe("checkDatabase", () => {
     it("should return up status when database is healthy", async () => {
-      const mockPrisma = {
-        $queryRaw: vi.fn().mockResolvedValue([{ "?column?": 1 }]),
-      } as unknown as PrismaClient;
+      const mockDb = vi.fn().mockResolvedValue([{ "?column?": 1 }]) as unknown as Sql;
 
-      const result = await healthManager.checkDatabase(mockPrisma);
+      const result = await healthManager.checkDatabase(mockDb);
 
       expect(result.status).toBe("up");
       expect(result.latency).toBeGreaterThanOrEqual(0);
-      expect(mockPrisma.$queryRaw).toHaveBeenCalled();
+      expect(mockDb).toHaveBeenCalled();
     });
 
     it("should return down status when database fails", async () => {
-      const mockPrisma = {
-        $queryRaw: vi.fn().mockRejectedValue(new Error("Connection failed")),
-      } as unknown as PrismaClient;
+      const mockDb = vi.fn().mockRejectedValue(new Error("Connection failed")) as unknown as Sql;
 
-      const result = await healthManager.checkDatabase(mockPrisma);
+      const result = await healthManager.checkDatabase(mockDb);
 
       expect(result.status).toBe("down");
       expect(result.error).toBe("Connection failed");
     });
 
     it("should handle non-Error exceptions", async () => {
-      const mockPrisma = {
-        $queryRaw: vi.fn().mockRejectedValue("String error"),
-      } as unknown as PrismaClient;
+      const mockDb = vi.fn().mockRejectedValue("String error") as unknown as Sql;
 
-      const result = await healthManager.checkDatabase(mockPrisma);
+      const result = await healthManager.checkDatabase(mockDb);
 
       expect(result.status).toBe("down");
       expect(result.error).toBe("Unknown error");
@@ -133,15 +127,13 @@ describe("HealthManager", () => {
 
   describe("getHealth", () => {
     it("should return healthy status when all services are up", async () => {
-      const mockPrisma = {
-        $queryRaw: vi.fn().mockResolvedValue([{ "?column?": 1 }]),
-      } as unknown as PrismaClient;
+      const mockDb = vi.fn().mockResolvedValue([{ "?column?": 1 }]) as unknown as Sql;
 
       const mockRedis = {
         ping: vi.fn().mockResolvedValue("PONG"),
       } as unknown as Redis;
 
-      const result = await healthManager.getHealth(mockPrisma, mockRedis);
+      const result = await healthManager.getHealth(mockDb, mockRedis);
 
       expect(result.status).toBe("healthy");
       expect(result.checks.database.status).toBe("up");
@@ -151,15 +143,13 @@ describe("HealthManager", () => {
     });
 
     it("should return degraded status when one service is down", async () => {
-      const mockPrisma = {
-        $queryRaw: vi.fn().mockRejectedValue(new Error("DB down")),
-      } as unknown as PrismaClient;
+      const mockDb = vi.fn().mockRejectedValue(new Error("DB down")) as unknown as Sql;
 
       const mockRedis = {
         ping: vi.fn().mockResolvedValue("PONG"),
       } as unknown as Redis;
 
-      const result = await healthManager.getHealth(mockPrisma, mockRedis);
+      const result = await healthManager.getHealth(mockDb, mockRedis);
 
       expect(result.status).toBe("degraded");
       expect(result.checks.database.status).toBe("down");
@@ -167,15 +157,13 @@ describe("HealthManager", () => {
     });
 
     it("should return unhealthy status when two or more services are down", async () => {
-      const mockPrisma = {
-        $queryRaw: vi.fn().mockRejectedValue(new Error("DB down")),
-      } as unknown as PrismaClient;
+      const mockDb = vi.fn().mockRejectedValue(new Error("DB down")) as unknown as Sql;
 
       const mockRedis = {
         ping: vi.fn().mockRejectedValue(new Error("Redis down")),
       } as unknown as Redis;
 
-      const result = await healthManager.getHealth(mockPrisma, mockRedis);
+      const result = await healthManager.getHealth(mockDb, mockRedis);
 
       expect(result.status).toBe("unhealthy");
       expect(result.checks.database.status).toBe("down");
@@ -183,29 +171,25 @@ describe("HealthManager", () => {
     });
 
     it("should include timestamp in ISO format", async () => {
-      const mockPrisma = {
-        $queryRaw: vi.fn().mockResolvedValue([{ "?column?": 1 }]),
-      } as unknown as PrismaClient;
+      const mockDb = vi.fn().mockResolvedValue([{ "?column?": 1 }]) as unknown as Sql;
 
       const mockRedis = {
         ping: vi.fn().mockResolvedValue("PONG"),
       } as unknown as Redis;
 
-      const result = await healthManager.getHealth(mockPrisma, mockRedis);
+      const result = await healthManager.getHealth(mockDb, mockRedis);
 
       expect(result.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
     });
 
     it("should track uptime since instantiation", async () => {
-      const mockPrisma = {
-        $queryRaw: vi.fn().mockResolvedValue([{ "?column?": 1 }]),
-      } as unknown as PrismaClient;
+      const mockDb = vi.fn().mockResolvedValue([{ "?column?": 1 }]) as unknown as Sql;
 
       const mockRedis = {
         ping: vi.fn().mockResolvedValue("PONG"),
       } as unknown as Redis;
 
-      const result = await healthManager.getHealth(mockPrisma, mockRedis);
+      const result = await healthManager.getHealth(mockDb, mockRedis);
 
       expect(result.uptime).toBeGreaterThanOrEqual(0);
       expect(typeof result.uptime).toBe("number");
@@ -258,16 +242,14 @@ describe("HealthManager", () => {
 
   describe("logHealth", () => {
     it("should log health check without errors", async () => {
-      const mockPrisma = {
-        $queryRaw: vi.fn().mockResolvedValue([{ "?column?": 1 }]),
-      } as unknown as PrismaClient;
+      const mockDb = vi.fn().mockResolvedValue([{ "?column?": 1 }]) as unknown as Sql;
 
       const mockRedis = {
         ping: vi.fn().mockResolvedValue("PONG"),
       } as unknown as Redis;
 
       // This should not throw
-      await expect(healthManager.logHealth(mockPrisma, mockRedis)).resolves.toBeUndefined();
+      await expect(healthManager.logHealth(mockDb, mockRedis)).resolves.toBeUndefined();
     });
   });
 });

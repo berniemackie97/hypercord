@@ -29,7 +29,7 @@ A hyper-advanced, enterprise-grade Discord bot framework built with TypeScript, 
 - **Formatting** - Prettier for consistent code style
 
 ### 📦 Infrastructure
-- **PostgreSQL** - Prisma ORM for database
+- **PostgreSQL** - Drizzle ORM for database
 - **Redis** - BullMQ for job queues
 - **Docker** - Containerized deployment
 - **Structured Logging** - Pino logger with JSON output
@@ -56,7 +56,7 @@ cp .env.example .env
 docker compose up -d
 
 # Run database migrations
-npx prisma migrate dev
+npm run db:migrate
 
 # Register commands
 npm run register
@@ -96,9 +96,11 @@ apps/bot/
 │   ├── utils/             # Helper functions
 │   │   └── dateParser.ts  # Duration parsing
 │   └── index.ts           # Entry point
-├── prisma/
-│   ├── schema.prisma      # Database schema
+├── drizzle/
 │   └── migrations/        # Database migrations
+├── src/db/
+│   ├── schema.ts          # Database schema
+│   └── index.ts           # Database client
 ├── scripts/
 │   └── register-commands.ts  # Command registration
 ├── Dockerfile
@@ -189,20 +191,21 @@ import {
 
 ```typescript
 import { healthManager } from "../core/health.js";
-import { PrismaClient } from "@prisma/client";
+import { db } from "../db/index.js";
 import Redis from "ioredis";
+import postgres from "postgres";
 
-const prisma = new PrismaClient();
+const queryClient = postgres(process.env.DATABASE_URL);
 const redis = new Redis();
 
 // Get health status
-const health = await healthManager.getHealth(prisma, redis);
+const health = await healthManager.getHealth(queryClient, redis);
 
 // Get metrics
 const metrics = healthManager.getMetrics();
 
 // Log health
-await healthManager.logHealth(prisma, redis);
+await healthManager.logHealth(queryClient, redis);
 ```
 
 ## Scripts

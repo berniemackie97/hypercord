@@ -31,8 +31,8 @@ COPY --from=deps /workspace /workspace
 COPY . .
 COPY ../../pnpm-workspace.yaml ../../package.json /workspace/
 
-# Generate Prisma Client
-RUN pnpm prisma generate
+# Generate Drizzle migrations
+RUN pnpm db:generate
 
 # Build the application
 RUN pnpm build
@@ -56,11 +56,9 @@ COPY --from=deps --chown=nodejs:nodejs /app/node_modules ./node_modules
 
 # Copy built application
 COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
-COPY --from=builder --chown=nodejs:nodejs /app/prisma ./prisma
+COPY --from=builder --chown=nodejs:nodejs /app/drizzle ./drizzle
+COPY --from=builder --chown=nodejs:nodejs /app/drizzle.config.ts ./
 COPY --from=builder --chown=nodejs:nodejs /app/package.json ./
-
-# Generate Prisma Client in production
-RUN pnpm prisma generate
 
 # Switch to non-root user
 USER nodejs
@@ -76,4 +74,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 ENTRYPOINT ["dumb-init", "--"]
 
 # Run migrations and start the bot
-CMD ["sh", "-c", "pnpm prisma migrate deploy && node dist/index.js"]
+CMD ["sh", "-c", "pnpm db:migrate && node dist/index.js"]

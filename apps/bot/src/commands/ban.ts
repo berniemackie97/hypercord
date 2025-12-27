@@ -8,6 +8,11 @@ import {
 } from "../core/middleware.js";
 import { rateLimitMiddleware } from "../core/rateLimiter.js";
 import { validationMiddleware, schemas, getValidatedOptions } from "../core/validation.js";
+import { db } from "../db/index.js";
+import { bans } from "../db/schema.js";
+import { ensureUser } from "../db/utils.js";
+import { createAuditLog } from "../core/audit.js";
+import { nanoid } from "nanoid";
 
 /**
  * Ban command - Permanently ban a member from the server
@@ -121,6 +126,33 @@ export const { data, execute } = createCommand(commandData)
       reason: reason || `Banned by ${interaction.user.tag}`,
       deleteMessageSeconds: (deleteDays || 0) * 86400,
     });
+
+    // Save ban to database and audit log
+    try {
+      await ensureUser(user);
+      await db.insert(bans).values({
+        id: nanoid(),
+        userId: user.id,
+        guildId: guild.id,
+        moderatorId: interaction.user.id,
+        reason: reason || "No reason provided",
+        isActive: true,
+      });
+
+      await createAuditLog({
+        guildId: guild.id,
+        moderatorId: interaction.user.id,
+        action: "ban",
+        targetId: user.id,
+        reason: reason,
+        metadata: {
+          deleteDays,
+        },
+      });
+    } catch (err) {
+      // Log but don't fail the command if database insert fails
+      console.error("Failed to save ban to database:", err);
+    }
 
     const embed = new EmbedBuilder()
       .setTitle("🔨 Member Banned")
