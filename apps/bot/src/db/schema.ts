@@ -265,6 +265,103 @@ export const auditLogs = pgTable(
 );
 
 // ============================================
+// Economy Tables
+// ============================================
+
+export const economy = pgTable(
+  "economy",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    guildId: text("guild_id")
+      .notNull()
+      .references(() => guilds.id, { onDelete: "cascade" }),
+    balance: integer("balance").default(0).notNull(),
+    bank: integer("bank").default(0).notNull(),
+    lastDaily: timestamp("last_daily"),
+    lastWork: timestamp("last_work"),
+    totalEarned: integer("total_earned").default(0).notNull(),
+    totalSpent: integer("total_spent").default(0).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    userGuildIdx: index("economy_user_guild_idx").on(table.userId, table.guildId),
+    balanceIdx: index("economy_balance_idx").on(table.balance),
+  })
+);
+
+export const transactions = pgTable(
+  "transactions",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    guildId: text("guild_id")
+      .notNull()
+      .references(() => guilds.id, { onDelete: "cascade" }),
+    type: text("type").notNull(), // earn, spend, transfer, gamble
+    amount: integer("amount").notNull(),
+    source: text("source").notNull(), // daily, work, pay, coinflip, etc
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    userIdx: index("transactions_user_id_idx").on(table.userId),
+    guildIdx: index("transactions_guild_id_idx").on(table.guildId),
+    typeIdx: index("transactions_type_idx").on(table.type),
+  })
+);
+
+// ============================================
+// Leveling Tables
+// ============================================
+
+export const levels = pgTable(
+  "levels",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    guildId: text("guild_id")
+      .notNull()
+      .references(() => guilds.id, { onDelete: "cascade" }),
+    xp: integer("xp").default(0).notNull(),
+    level: integer("level").default(0).notNull(),
+    totalXp: integer("total_xp").default(0).notNull(),
+    messageCount: integer("message_count").default(0).notNull(),
+    lastXpGain: timestamp("last_xp_gain"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    userGuildIdx: index("levels_user_guild_idx").on(table.userId, table.guildId),
+    levelIdx: index("levels_level_idx").on(table.level),
+    xpIdx: index("levels_xp_idx").on(table.xp),
+  })
+);
+
+export const levelRewards = pgTable(
+  "level_rewards",
+  {
+    id: text("id").primaryKey(),
+    guildId: text("guild_id")
+      .notNull()
+      .references(() => guilds.id, { onDelete: "cascade" }),
+    level: integer("level").notNull(),
+    roleId: text("role_id").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    guildLevelIdx: index("level_rewards_guild_level_idx").on(table.guildId, table.level),
+  })
+);
+
+// ============================================
 // Analytics Tables
 // ============================================
 
@@ -300,6 +397,9 @@ export const guildsRelations = relations(guilds, ({ many }) => ({
   auditLogs: many(auditLogs),
   commandLogs: many(commandLogs),
   customCommands: many(customCommands),
+  economy: many(economy),
+  levels: many(levels),
+  levelRewards: many(levelRewards),
 }));
 
 export const usersRelations = relations(users, ({ many }) => ({
@@ -309,6 +409,9 @@ export const usersRelations = relations(users, ({ many }) => ({
   kicks: many(kicks),
   notes: many(notes),
   reminders: many(reminders),
+  economy: many(economy),
+  levels: many(levels),
+  transactions: many(transactions),
 }));
 
 export const guildMembersRelations = relations(guildMembers, ({ one }) => ({
@@ -353,6 +456,25 @@ export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
   guild: one(guilds, { fields: [auditLogs.guildId], references: [guilds.id] }),
 }));
 
+export const economyRelations = relations(economy, ({ one }) => ({
+  user: one(users, { fields: [economy.userId], references: [users.id] }),
+  guild: one(guilds, { fields: [economy.guildId], references: [guilds.id] }),
+}));
+
+export const transactionsRelations = relations(transactions, ({ one }) => ({
+  user: one(users, { fields: [transactions.userId], references: [users.id] }),
+  guild: one(guilds, { fields: [transactions.guildId], references: [guilds.id] }),
+}));
+
+export const levelsRelations = relations(levels, ({ one }) => ({
+  user: one(users, { fields: [levels.userId], references: [users.id] }),
+  guild: one(guilds, { fields: [levels.guildId], references: [guilds.id] }),
+}));
+
+export const levelRewardsRelations = relations(levelRewards, ({ one }) => ({
+  guild: one(guilds, { fields: [levelRewards.guildId], references: [guilds.id] }),
+}));
+
 // ============================================
 // Type exports
 // ============================================
@@ -392,3 +514,15 @@ export type NewAuditLog = typeof auditLogs.$inferInsert;
 
 export type DailyStats = typeof dailyStats.$inferSelect;
 export type NewDailyStats = typeof dailyStats.$inferInsert;
+
+export type Economy = typeof economy.$inferSelect;
+export type NewEconomy = typeof economy.$inferInsert;
+
+export type Transaction = typeof transactions.$inferSelect;
+export type NewTransaction = typeof transactions.$inferInsert;
+
+export type Level = typeof levels.$inferSelect;
+export type NewLevel = typeof levels.$inferInsert;
+
+export type LevelReward = typeof levelRewards.$inferSelect;
+export type NewLevelReward = typeof levelRewards.$inferInsert;

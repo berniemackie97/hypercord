@@ -1,10 +1,15 @@
-import { Events, type Message, PermissionFlagsBits } from "discord.js";
+import { Events, type Message, PermissionFlagsBits, EmbedBuilder } from "discord.js";
 import { log } from "../core/logger.js";
 import { getGuildConfig } from "../core/guildConfig.js";
 import { createAuditLog } from "../core/audit.js";
+import { addXP, calculateMessageXP } from "../utils/leveling.js";
 
 export const name = Events.MessageCreate;
 export const once = false;
+
+// Track XP cooldowns (prevent XP spam)
+const xpCooldowns = new Map<string, number>();
+const XP_COOLDOWN = 60000; // 1 minute between XP gains
 
 /**
  * Spam detection configuration
@@ -50,7 +55,12 @@ export async function execute(message: Message) {
   // Ignore bots and DMs
   if (message.author.bot || !message.guild) return;
 
-  // Check if bot has permission to timeout members
+  // Handle XP gain (non-blocking)
+  handleXPGain(message).catch((err) => {
+    log.error({ err, guild: message.guild?.id, user: message.author.id }, "failed to add XP");
+  });
+
+  // Check if bot has permission to timeout members for spam detection
   const botMember = await message.guild.members.fetchMe().catch(() => null);
   if (!botMember || !botMember.permissions.has(PermissionFlagsBits.ModerateMembers)) {
     return;
@@ -185,3 +195,54 @@ export async function execute(message: Message) {
     log.error({ err, guild: message.guild.id, user: message.author.id }, "failed to timeout user for spam");
   }
 }
+
+/**
+ * Handle XP gain from messages
+ */
+async function handleXPGain(message: Message) {
+  if (!message.guild) return;
+
+  const cooldownKey = `${message.guild.id}:${message.author.id}`;
+  const now = Date.now();
+  const lastXP = xpCooldowns.get(cooldownKey);
+
+  // Check cooldown
+  if (lastXP && now - lastXP < XP_COOLDOWN) {
+    return;
+  }
+
+  // Add XP
+  const xpAmount = calculateMessageXP();
+  const result = await addXP(message.author.id, message.guild.id, xpAmount);
+
+  // Update cooldown
+  xpCooldowns.set(cooldownKey, now);
+
+  // Send level up message if leveled up
+  if (result.leveledUp) {
+    const embed = new EmbedBuilder()
+      .setTitle("🎉 Level Up!")
+      .setDescription(`${message.author} reached **Level ${result.newLevel}**!`)
+      .setColor(0x00ff00)
+      .setThumbnail(message.author.displayAvatarURL())
+      .addFields({
+        name: "⭐ New Level",
+        value: result.newLevel.toString(),
+        inline: true,
+      })
+      .setFooter({ text: "Keep chatting to level up!" })
+      .setTimestamp();
+
+    await message.channel.send({ embeds: [embed] }).catch(() => {});
+  }
+}
+
+// Cleanup old XP cooldowns periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, timestamp] of xpCooldowns.entries()) {
+    if (now - timestamp > XP_COOLDOWN * 2) {
+      xpCooldowns.delete(key);
+    }
+  }
+}, 300000); // Every 5 minutes

@@ -9,7 +9,7 @@
 - ✅ **Command Logging** - Every command execution logged with metadata
 - ✅ **Soft Deletes** - Historical data preserved when bot leaves servers
 
-### Tables (12 Total)
+### Tables (16 Total)
 1. **users** - Discord user profiles
 2. **guilds** - Server information and config
 3. **guildMembers** - User-guild relationships
@@ -22,6 +22,10 @@
 10. **customCommands** - Guild-specific custom commands (future)
 11. **auditLogs** - Complete moderation audit trail
 12. **dailyStats** - Aggregated daily statistics
+13. **economy** - User economy data (balance, bank, earnings)
+14. **transactions** - Complete transaction history
+15. **levels** - User XP and level tracking
+16. **levelRewards** - Role rewards for reaching levels
 
 ## Moderation Commands
 
@@ -45,6 +49,49 @@
 - Full audit logging
 - Metadata tracking (reasons, durations, etc.)
 - Auto-moderation (spam detection)
+
+## Economy System
+
+### Currency Commands
+- ✅ `/balance` - View user's wallet and bank balance
+- ✅ `/daily` - Claim daily reward (500-1000 currency, 24h cooldown)
+- ✅ `/work` - Work for currency (200-500 currency, 1h cooldown)
+- ✅ `/pay` - Transfer currency to another user
+- ✅ `/coinflip` - Flip a coin (optionally gamble currency)
+- ✅ `/leaderboard` - View currency leaderboard
+
+### Economy Features
+- Per-guild currency system
+- Wallet and bank storage
+- Transaction logging (all transactions tracked)
+- Cooldown system (prevents spam)
+- Statistics tracking (total earned, total spent)
+- Gambling system
+- Leaderboard rankings
+
+## Leveling System
+
+### Leveling Commands
+- ✅ `/rank` - View your rank, level, and XP progress
+- ✅ `/leaderboard` - View server level leaderboard
+
+### Leveling Features
+- ✅ **XP from Messages** - Earn 15-25 XP per message (1 min cooldown)
+- ✅ **Dynamic Level Calculation** - XP formula: 5*(level²) + 50*level + 100
+- ✅ **Level Up Notifications** - Automatic embed messages on level up
+- ✅ **Progress Tracking** - Message count and total XP tracking
+- ✅ **Rank System** - Global server rankings
+- ✅ **Visual Progress Bar** - Shows XP progress to next level
+
+## Fun & Games
+
+### Game Commands
+- ✅ `/8ball` - Ask the magic 8-ball a question
+- ✅ `/coinflip` - Flip a coin (with optional betting)
+
+### Social Commands
+- ✅ `/avatar` - Display user's avatar (high resolution)
+- ✅ `/serverinfo` - Display detailed server information
 
 ## Utility Commands
 
@@ -295,9 +342,17 @@
 
 ## Statistics
 
-- **12 database tables** - Complete data model
-- **19 commands** - Comprehensive command library
+- **16 database tables** - Complete data model (moderation, economy, leveling, analytics)
+- **30+ commands** - Comprehensive command library
+  - 8 moderation commands
+  - 5 economy commands
+  - 2 leveling commands
+  - 2 game commands
+  - 2 social commands
+  - 8 utility commands
+  - 4 configuration commands
 - **5 middleware types** - Comprehensive request pipeline
 - **2 background queues** - Async task processing
 - **118 tests** - Extensive test coverage (100% passing)
-- **9 event handlers** - Full Discord event coverage (ready, interactionCreate, guildCreate, guildDelete, guildMemberAdd, guildMemberRemove, messageCreate)
+- **9 event handlers** - Full Discord event coverage
+- **16.8 KB bundle** - Optimized production build
