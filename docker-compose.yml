@@ -1,0 +1,118 @@
+version: '3.9'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: hypercord-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hypercord
+      POSTGRES_PASSWORD: dev_password_change_in_production
+      POSTGRES_DB: hypercord
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U hypercord']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hypercord-network
+
+  # Redis Cache & Queue
+  redis:
+    image: redis:7-alpine
+    container_name: hypercord-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass dev_redis_password
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', '--raw', 'incr', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hypercord-network
+
+  # Discord Bot
+  bot:
+    build:
+      context: ./apps/bot
+      dockerfile: Dockerfile
+      target: production
+    container_name: hypercord-bot
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      BOT_TOKEN: ${BOT_TOKEN}
+      APPLICATION_ID: ${APPLICATION_ID}
+      DATABASE_URL: postgresql://hypercord:dev_password_change_in_production@postgres:5432/hypercord?schema=public&connection_limit=5&pool_timeout=20
+      REDIS_URL: redis://:dev_redis_password@redis:6379
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      ADMIN_USER_IDS: ${ADMIN_USER_IDS:-}
+      ADMIN_ROLE_IDS: ${ADMIN_ROLE_IDS:-}
+    networks:
+      - hypercord-network
+    # Uncomment for debugging
+    # ports:
+    #   - '3000:3000'
+
+  # Optional: pgAdmin for database management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: hypercord-pgadmin
+    restart: unless-stopped
+    profiles:
+      - tools
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@hypercord.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - '5050:80'
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    networks:
+      - hypercord-network
+
+  # Optional: Redis Commander for Redis management
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: hypercord-redis-commander
+    restart: unless-stopped
+    profiles:
+      - tools
+    environment:
+      REDIS_HOSTS: local:redis:6379:0:dev_redis_password
+    ports:
+      - '8081:8081'
+    depends_on:
+      - redis
+    networks:
+      - hypercord-network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+
+networks:
+  hypercord-network:
+    driver: bridge

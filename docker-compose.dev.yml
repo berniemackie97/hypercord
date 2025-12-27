@@ -1,0 +1,27 @@
+version: '3.9'
+
+# Development override - use with: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  bot:
+    build:
+      context: ./apps/bot
+      dockerfile: Dockerfile
+      target: builder  # Use builder stage for dev with all dependencies
+    command: pnpm dev  # Use dev script with hot reload
+    environment:
+      NODE_ENV: development
+      LOG_LEVEL: debug
+    volumes:
+      # Mount source code for hot reload
+      - ./apps/bot/src:/app/src:ro
+      - ./apps/bot/prisma:/app/prisma:ro
+    ports:
+      - '3000:3000'  # Expose for debugging
+
+  # Auto-start tools in dev mode
+  pgadmin:
+    profiles: []  # Remove profile to start by default
+
+  redis-commander:
+    profiles: []  # Remove profile to start by default

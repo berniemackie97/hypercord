@@ -1,19 +1,83 @@
 name: CI
-on: [push, pull_request]
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
 jobs:
-  build:
+  test:
+    name: Test & Build
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: hypercord_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: "pnpm"
-      - name: Install
-        run: pnpm install
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: ./apps/bot
+
       - name: Lint
-        run: pnpm run lint
-      - name: Build
-        run: pnpm run build
-      - name: Test
-        run: pnpm run test
+        run: npm run lint
+        working-directory: ./apps/bot
+
+      - name: Type check
+        run: npm run build
+        working-directory: ./apps/bot
+
+      - name: Run tests with coverage
+        run: npm run test:coverage
+        working-directory: ./apps/bot
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/hypercord_test
+          REDIS_URL: redis://localhost:6379
+          BOT_TOKEN: test-token
+          CLIENT_ID: test-client-id
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./apps/bot/coverage/lcov.info
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+      - name: Comment coverage on PR
+        if: github.event_name == 'pull_request'
+        uses: romeovs/lcov-reporter-action@v0.3.1
+        with:
+          lcov-file: ./apps/bot/coverage/lcov.info
+          github-token: ${{ secrets.GITHUB_TOKEN }}

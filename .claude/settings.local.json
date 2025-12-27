@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm add:*)",
+      "Bash(npm install:*)",
+      "Bash(npm test:*)",
+      "Bash(cat:*)",
+      "Bash(where:*)",
+      "Bash(corepack enable)",
+      "Bash(pnpm:*)",
+      "Bash(npm cache clean:*)",
+      "Bash(git config:*)",
+      "Bash(git checkout:*)",
+      "Bash(npx pnpm install)",
+      "Bash(npx pnpm test:*)",
+      "Bash(npx pnpm install:*)",
+      "Bash(npx pnpm run test)",
+      "Bash(npx pnpm run:*)",
+      "Bash(npm run test:coverage:*)"
+    ]
+  }
+}

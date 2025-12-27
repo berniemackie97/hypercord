@@ -1,0 +1,35 @@
+version: 1
+meta:
+    template:
+        id: node
+    inputs:
+        node.runner: pnpm
+        node.scripts: lint,test,build
+        template.id: node
+checks:
+    - id: detector:node-scripts:24dc39d25829
+      source: detector:node-scripts
+      name: lint
+      run: pnpm run lint
+      shell: cmd
+      requires: pnpm
+    - id: detector:node-scripts:e829aff7e359
+      source: detector:node-scripts
+      name: tests
+      run: pnpm run test
+      shell: cmd
+      requires: pnpm
+    - id: detector:node-scripts:831f44060f5d
+      source: detector:node-scripts
+      name: build
+      run: pnpm run build
+      shell: cmd
+      requires: pnpm
+insults:
+    mode: snarky
+    file: .buildbouncer/assets/insults/default.json
+    locale: en
+banter:
+    enabled: true
+    file: .buildbouncer/assets/banter/default.json
+    locale: en
