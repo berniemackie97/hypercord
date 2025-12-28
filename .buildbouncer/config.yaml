@@ -25,6 +25,50 @@ checks:
       run: pnpm run build
       shell: cmd
       requires: pnpm
+    - id: ci:ci:6b87c2c456d5
+      source: ci:ci
+      name: ci:ci:test-build:setup-node.js
+      run: npm --version
+      shell: pwsh
+      os: windows
+      requires: npm
+    - id: ci:ci:7947bc345239
+      source: ci:ci
+      name: ci:ci:test-build:install-dependencies
+      run: npm ci
+      shell: pwsh
+      cwd: ./apps/bot
+      os: windows
+      requires: npm
+    - id: ci:ci:aeab575f7ac5
+      source: ci:ci
+      name: ci:ci:test-build:lint
+      run: npm run lint
+      shell: pwsh
+      cwd: ./apps/bot
+      os: windows
+      requires: npm
+    - id: ci:ci:9f58679c04ed
+      source: ci:ci
+      name: ci:ci:test-build:type-check
+      run: npm run build
+      shell: pwsh
+      cwd: ./apps/bot
+      os: windows
+      requires: npm
+    - id: ci:ci:c286aad5100d
+      source: ci:ci
+      name: ci:ci:test-build:run-tests-with-coverage
+      run: npm run test:coverage
+      shell: pwsh
+      cwd: ./apps/bot
+      env:
+        BOT_TOKEN: test-token
+        CLIENT_ID: test-client-id
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/hypercord_test
+        REDIS_URL: redis://localhost:6379
+      os: windows
+      requires: npm
 insults:
     mode: snarky
     file: .buildbouncer/assets/insults/default.json
