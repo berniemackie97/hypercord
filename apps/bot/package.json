@@ -34,7 +34,7 @@
     "discord.js": "^14.15.3",
     "dotenv": "^17.2.2",
     "drizzle-orm": "^0.36.4",
-    "ioredis": "^5.4.1",
+    "ioredis": "^6.0.0",
     "nanoid": "^5.0.8",
     "openai": "^6.15.0",
     "pino": "^9.5.0",
