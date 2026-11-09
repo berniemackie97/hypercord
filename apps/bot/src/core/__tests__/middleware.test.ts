@@ -87,17 +87,27 @@ describe("Middleware System", () => {
   });
 
   describe("permissionMiddleware", () => {
+    it("rejects interactions with missing resolved member permissions", async () => {
+      const next = vi.fn();
+      const interaction: any = {
+        guild: { id: "123" },
+        member: { permissions: { has: vi.fn().mockReturnValue(true) } },
+        memberPermissions: null,
+        reply: vi.fn(),
+      };
+      await permissionMiddleware([PermissionFlagsBits.Administrator])(interaction, next);
+      expect(next).not.toHaveBeenCalled();
+      expect(interaction.reply).toHaveBeenCalledOnce();
+    });
+
     it("should allow users with required permissions", async () => {
       const middleware = permissionMiddleware([PermissionFlagsBits.ManageGuild]);
       const next = vi.fn();
 
       const interaction: any = {
         guild: { id: "123" },
-        member: {
-          permissions: {
-            has: vi.fn().mockReturnValue(true),
-          },
-        },
+        member: { id: "123" },
+        memberPermissions: { has: vi.fn().mockReturnValue(true) },
       };
 
       await middleware(interaction, next);
@@ -111,11 +121,8 @@ describe("Middleware System", () => {
 
       const interaction: any = {
         guild: { id: "123" },
-        member: {
-          permissions: {
-            has: vi.fn().mockReturnValue(false),
-          },
-        },
+        member: { id: "123" },
+        memberPermissions: { has: vi.fn().mockReturnValue(false) },
         reply: vi.fn(),
       };
 
@@ -259,8 +266,9 @@ describe("Middleware System", () => {
       await middleware(interaction, next);
 
       expect(interaction.reply).toHaveBeenCalledWith({
-        content: expect.stringContaining("Test error"),
-        ephemeral: true,
+        content: expect.stringContaining("could not be completed"),
+        allowedMentions: { parse: [] },
+        flags: 64,
       });
     });
 
@@ -279,7 +287,8 @@ describe("Middleware System", () => {
       await middleware(interaction, next);
 
       expect(interaction.editReply).toHaveBeenCalledWith({
-        content: expect.stringContaining("Test error"),
+        content: expect.stringContaining("could not be completed"),
+        allowedMentions: { parse: [] },
       });
     });
   });

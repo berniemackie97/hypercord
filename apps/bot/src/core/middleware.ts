@@ -1,5 +1,6 @@
 import type { ChatInputCommandInteraction } from "discord.js";
 import { log } from "./logger.js";
+import { sendPrivateError } from "./interactionError.js";
 
 /**
  * Middleware function type
@@ -13,7 +14,7 @@ export type Middleware = (
  * Middleware context for storing data between middleware
  */
 export interface MiddlewareContext {
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**
@@ -94,8 +95,9 @@ export function permissionMiddleware(permissions: bigint[]): Middleware {
       return;
     }
 
-    const member = interaction.member as any;
-    const hasPermission = permissions.every((perm) => member.permissions.has(perm));
+    const hasPermission = permissions.every((perm) =>
+      interaction.memberPermissions?.has(perm) ?? false
+    );
 
     if (!hasPermission) {
       await interaction.reply({
@@ -172,22 +174,10 @@ export function errorHandlerMiddleware(): Middleware {
         "command error"
       );
 
-      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
-
-      try {
-        if (interaction.deferred || interaction.replied) {
-          await interaction.editReply({
-            content: `❌ Error: ${errorMessage}`,
-          });
-        } else {
-          await interaction.reply({
-            content: `❌ Error: ${errorMessage}`,
-            ephemeral: true,
-          });
-        }
-      } catch (replyError) {
-        log.error({ error: replyError }, "failed to send error message");
-      }
+      await sendPrivateError(
+        interaction,
+        "The command could not be completed. Please try again later.",
+      );
     }
   };
 }

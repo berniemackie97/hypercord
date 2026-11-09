@@ -1,4 +1,4 @@
-import { Events, type Message } from "discord.js";
+import { Events, type Message, type PartialMessage } from "discord.js";
 import { log } from "../core/logger.js";
 import { db } from "../db/index.js";
 import { messageCache } from "../db/schema.js";
@@ -7,10 +7,8 @@ import { eq } from "drizzle-orm";
 export const name = Events.MessageDelete;
 export const once = false;
 
-export async function execute(message: Message) {
-  // Ignore partial messages or DMs
-  if (message.partial) return;
-  if (!message.guild) return;
+export async function execute(message: Message | PartialMessage) {
+  if (!message.guildId) return;
 
   try {
     // Update messageCache with deletion timestamp
@@ -21,7 +19,7 @@ export async function execute(message: Message) {
 
     log.debug(
       {
-        guild: message.guild.id,
+        guild: message.guildId,
         channel: message.channelId,
         messageId: message.id,
         author: message.author?.id,
