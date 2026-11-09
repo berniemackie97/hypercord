@@ -32,12 +32,7 @@ export async function checkDatabaseConnection(): Promise<boolean> {
   }
 }
 
-// Graceful shutdown
 export async function closeDatabaseConnection(): Promise<void> {
-  try {
-    await queryClient.end();
-    log.info("Database connection closed");
-  } catch (error) {
-    log.error({ error }, "Error closing database connection");
-  }
+  await queryClient.end();
+  log.info("database connection closed");
 }

@@ -4,7 +4,7 @@ import IORedis from "ioredis";
 import { type Client, type GuildTextBasedChannel } from "discord.js";
 import { env } from "../core/config.js";
 import { db } from "../db/index.js";
-import { reminders, commandLogs, guilds, guildMembers, dailyStats } from "../db/schema.js";
+import { reminders, commandLogs, dailyStats } from "../db/schema.js";
 import { eq, sql, and, gte, lt } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { log } from "../core/logger.js";
@@ -21,6 +21,9 @@ export const queues = {
   aiQuotaReset: new Queue("ai-quota-reset", { connection }),
 };
 
+const workers: Worker[] = [];
+let workersStarted = false;
+
 function isGuildTextSendable(ch: unknown): ch is GuildTextBasedChannel {
   return !!ch
     && typeof (ch as any).isTextBased === "function"
@@ -28,9 +31,13 @@ function isGuildTextSendable(ch: unknown): ch is GuildTextBasedChannel {
     && "guildId" in (ch as any);
 }
 
-export function startWorkers(client: Client) {
+export async function startWorkers(client: Client): Promise<void> {
+  if (workersStarted) {
+    throw new Error("Background workers already started");
+  }
+  workersStarted = true;
   // AI Quota Reset Worker
-  new Worker(
+  workers.push(new Worker(
     "ai-quota-reset",
     async (job) => {
       log.info("Starting monthly AI quota reset");
@@ -50,22 +57,9 @@ export function startWorkers(client: Client) {
       }
     },
     { connection }
-  );
+  ));
 
-  // Schedule monthly AI quota reset (runs on 1st of month at midnight)
-  queues.aiQuotaReset.add(
-    "monthly-reset",
-    {},
-    {
-      repeat: {
-        pattern: "0 0 1 * *", // Cron: At 00:00 on day-of-month 1
-      },
-    }
-  ).then(() => {
-    log.info("AI quota reset job scheduled (monthly on 1st at midnight)");
-  });
-
-  new Worker(
+  workers.push(new Worker(
     "reminders",
     async (job) => {
       const {
@@ -120,10 +114,10 @@ export function startWorkers(client: Client) {
       }
     },
     { connection },
-  );
+  ));
 
   // Daily stats aggregation worker
-  new Worker(
+  workers.push(new Worker(
     "dailyStats",
     async (job) => {
       const { date }: { date: string } = job.data;
@@ -211,5 +205,46 @@ export function startWorkers(client: Client) {
       }
     },
     { connection },
+  ));
+
+  for (const worker of workers) {
+    worker.on("error", (error) => {
+      log.error({ error, queue: worker.name }, "background worker connection error");
+    });
+  }
+
+  await queues.aiQuotaReset.add("monthly-reset", {}, {
+    repeat: { pattern: "0 0 1 * *" },
+  });
+  log.info("monthly AI quota reset scheduled");
+}
+
+export async function stopWorkers(): Promise<void> {
+  const results = await Promise.allSettled(workers.map((worker) => worker.close()));
+  workers.length = 0;
+  workersStarted = false;
+
+  const failures = results.flatMap((result) =>
+    result.status === "rejected" ? [result.reason] : []
   );
+  if (failures.length > 0) {
+    throw new AggregateError(failures, "Failed to drain background workers");
+  }
+}
+
+export async function closeQueues(): Promise<void> {
+  const results = await Promise.allSettled(Object.values(queues).map((queue) => queue.close()));
+  const failures = results.flatMap((result) =>
+    result.status === "rejected" ? [result.reason] : []
+  );
+
+  try {
+    await connection.quit();
+  } catch (error) {
+    failures.push(error);
+  }
+
+  if (failures.length > 0) {
+    throw new AggregateError(failures, "Failed to close queue connections");
+  }
 }
