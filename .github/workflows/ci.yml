@@ -17,7 +17,7 @@ jobs:
   test:
     name: Validate workspace
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     services:
       postgres:
@@ -67,6 +67,26 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      - name: Verify migrations on fresh and existing schema
+        run: |
+          pnpm --filter @hypercord/bot db:migrate
+          pnpm --filter @hypercord/bot db:migrate
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/hypercord_test
+
+      - name: Validate deployment configuration
+        run: docker compose config --quiet
+        env:
+          BOT_TOKEN: ci-test-token
+          CLIENT_ID: ci-test-client
+          POSTGRES_PASSWORD: ci-postgres-password
+          REDIS_PASSWORD: ci-redis-password
+          DATABASE_URL: postgresql://postgres:postgres@postgres:5432/hypercord_test
+          REDIS_URL: redis://:ci-redis-password@redis:6379
+
+      - name: Build production image
+        run: docker build --file apps/bot/Dockerfile --target production .
 
       - name: Tests with coverage
         run: pnpm --filter @hypercord/bot test:coverage

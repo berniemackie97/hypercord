@@ -1,77 +1,31 @@
-# ============================================
-# Multi-stage Dockerfile for Production
-# ============================================
-
-# Stage 1: Dependencies
-FROM node:22-alpine AS deps
+FROM node:22.16.0-alpine AS base
 WORKDIR /app
-
-# Enable corepack for pnpm
 RUN corepack enable
 
-# Copy package files
-COPY package.json pnpm-lock.yaml ./
-COPY ../../pnpm-workspace.yaml ../../package.json /workspace/
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/bot/package.json apps/bot/package.json
+COPY packages/shared/package.json packages/shared/package.json
 
-# Install dependencies only
-RUN pnpm install --frozen-lockfile --prod=false
+FROM base AS build
+RUN pnpm install --frozen-lockfile
+COPY tsconfig.base.json ./
+COPY apps/bot apps/bot
+COPY packages/shared packages/shared
+RUN pnpm --filter @hypercord/bot build
 
-# Stage 2: Builder
-FROM node:22-alpine AS builder
-WORKDIR /app
+FROM base AS production-dependencies
+RUN pnpm install --frozen-lockfile --prod --filter @hypercord/bot
 
-# Enable corepack
-RUN corepack enable
-
-# Copy dependencies from deps stage
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /workspace /workspace
-
-# Copy source code
-COPY . .
-COPY ../../pnpm-workspace.yaml ../../package.json /workspace/
-
-# Generate Drizzle migrations
-RUN pnpm db:generate
-
-# Build the application
-RUN pnpm build
-
-# Stage 3: Production
-FROM node:22-alpine AS production
-WORKDIR /app
-
-# Install dumb-init for proper signal handling
+FROM node:22.16.0-alpine AS production
+ENV NODE_ENV=production
+WORKDIR /app/apps/bot
 RUN apk add --no-cache dumb-init
 
-# Create non-root user
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001
+COPY --from=production-dependencies --chown=node:node /app/node_modules /app/node_modules
+COPY --from=production-dependencies --chown=node:node /app/apps/bot/node_modules /app/apps/bot/node_modules
+COPY --from=production-dependencies --chown=node:node /app/apps/bot/package.json /app/apps/bot/package.json
+COPY --from=build --chown=node:node /app/apps/bot/dist /app/apps/bot/dist
 
-# Enable corepack
-RUN corepack enable
-
-# Copy only production dependencies
-COPY --from=deps --chown=nodejs:nodejs /app/node_modules ./node_modules
-
-# Copy built application
-COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
-COPY --from=builder --chown=nodejs:nodejs /app/drizzle ./drizzle
-COPY --from=builder --chown=nodejs:nodejs /app/drizzle.config.ts ./
-COPY --from=builder --chown=nodejs:nodejs /app/package.json ./
-
-# Switch to non-root user
-USER nodejs
-
-# Expose health check port (if using HTTP health endpoint)
-EXPOSE 3000
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})" || exit 1
-
-# Use dumb-init to handle signals properly
+USER node
 ENTRYPOINT ["dumb-init", "--"]
-
-# Run migrations and start the bot
-CMD ["sh", "-c", "pnpm db:migrate && node dist/index.js"]
+CMD ["node", "dist/index.js"]

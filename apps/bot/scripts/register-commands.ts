@@ -1,29 +1,38 @@
-import { REST, Routes } from "discord.js";
-import { readdirSync } from "node:fs";
-import path from "node:path";
 import "dotenv/config";
+import { REST, Routes } from "discord.js";
+import { commandModules } from "../src/lib/catalog.js";
 
-const TOKEN = process.env.BOT_TOKEN!;
-const CLIENT_ID = process.env.CLIENT_ID!;
-const GUILD_ID = process.env.GUILD_ID; // optional for fast dev
+async function main(): Promise<void> {
+  const token = process.env.BOT_TOKEN;
+  const clientId = process.env.CLIENT_ID;
+  const guildId = process.env.GUILD_ID?.trim();
 
-async function main() {
-  const rest = new REST({ version: "10" }).setToken(TOKEN);
-  const cmds: any[] = [];
-
-  const dir = new URL("../src/commands", import.meta.url);
-  const files = readdirSync(dir).filter(f => f.endsWith(".ts"));
-  for (const f of files) {
-    const mod = await import(path.join(dir.pathname, f));
-    cmds.push(mod.data.toJSON());
+  if (!token || !clientId) {
+    throw new Error("BOT_TOKEN and CLIENT_ID are required to register commands");
   }
 
-  if (GUILD_ID) {
-    await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), { body: cmds });
-    console.log(`Registered ${cmds.length} guild command(s) to ${GUILD_ID}`);
-  } else {
-    await rest.put(Routes.applicationCommands(CLIENT_ID), { body: cmds });
-    console.log(`Registered ${cmds.length} global command(s)`);
-  }
+  const names = new Set<string>();
+  const definitions = commandModules.map((command) => {
+    if (!command.data?.name || typeof command.execute !== "function") {
+      throw new Error("Command catalog contains an invalid command");
+    }
+    if (names.has(command.data.name)) {
+      throw new Error(`Duplicate command: ${command.data.name}`);
+    }
+    names.add(command.data.name);
+    return command.data.toJSON();
+  });
+
+  const rest = new REST({ version: "10" }).setToken(token);
+  const route = guildId
+    ? Routes.applicationGuildCommands(clientId, guildId)
+    : Routes.applicationCommands(clientId);
+
+  await rest.put(route, { body: definitions });
+  console.info(`Registered ${definitions.length} ${guildId ? "guild" : "global"} commands`);
 }
-main().catch(e => { console.error(e); process.exit(1); });
+
+main().catch((error: unknown) => {
+  console.error(error instanceof Error ? error.message : "Command registration failed");
+  process.exitCode = 1;
+});

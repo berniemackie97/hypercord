@@ -2,7 +2,7 @@
 
 **The most advanced, feature-rich Discord bot you can self-host.**
 
-[![Tests](https://img.shields.io/badge/tests-118%20passing-success)](./apps/bot/TESTING.md)
+[![Tests](https://img.shields.io/badge/tests-123%20passing-success)](./apps/bot/TESTING.md)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)](./)
 [![Discord.js](https://img.shields.io/badge/discord.js-14.22-5865F2)](./)
 
@@ -17,8 +17,8 @@
 
 ### 💎 **Enterprise-Grade Features**
 - **25 Database Tables**: Complete data model with Drizzle ORM
-- **43+ Commands**: Moderation, Economy, Leveling, Casino, AI, and more
-- **118 Tests (100% passing)**: Full test coverage
+- **36 command modules**: Moderation, economy, leveling, casino, AI, and more
+- **123 passing tests**: Approximately 40% line coverage in the verified CI baseline
 - **Multi-tier AI Access**: Guild > Channel > User priority system
 - **Real-time Cost Tracking**: Know exactly what you're spending
 
@@ -59,9 +59,8 @@ pnpm install
 cp apps/bot/.env.example apps/bot/.env
 # Edit .env with your credentials
 
-# Run database migrations
-cd apps/bot
-pnpm db:push
+# Run versioned database migrations
+pnpm --filter @hypercord/bot db:migrate
 
 # Start the bot
 pnpm dev
@@ -70,23 +69,26 @@ pnpm dev
 ### Docker Setup (Recommended)
 
 ```bash
-# Start all services (bot, postgres, redis, pgadmin)
-docker-compose up -d
+# Configure credentials using .env.example before running
+cp .env.example .env
+# Edit passwords, URLs, token and application ID
+
+docker compose up --build -d
 
 # View logs
-docker-compose logs -f bot
+docker compose logs -f bot
 
 # Stop services
-docker-compose down
+docker compose down
 ```
 
 ## AI Setup (Optional but Recommended)
 
-Get FREE unlimited AI with Google Gemini:
+To configure an optional AI provider:
 
 1. Visit https://ai.google.dev
 2. Get API key (FREE, no credit card required)
-3. Add to `.env`: `GEMINI_API_KEY=your_key_here`
+3. Add the provider's API key to your environment
 4. In Discord: `/ai-config set-default gemini gemini-1.5-flash`
 5. Mention the bot: `@BotName explain TypeScript`
 
@@ -162,7 +164,7 @@ hypercord/
 │   │   ├── db/             # Database schema & migrations
 │   │   ├── queue/          # Background jobs (BullMQ)
 │   │   └── utils/          # Utilities and helpers
-│   └── __tests__/          # Test suite (118 tests)
+│   └── __tests__/          # Test suite (123 tests)
 ├── docker-compose.yml      # Production stack
 ├── FEATURES.md             # Complete feature list
 └── README.md               # This file
@@ -174,7 +176,7 @@ hypercord/
 - **Database**: PostgreSQL + Drizzle ORM
 - **Cache/Queue**: Redis + BullMQ
 - **AI**: OpenAI, Anthropic, Google AI SDKs
-- **Testing**: Vitest (118 tests, 100% passing)
+- **Testing**: Vitest (123 passing tests; coverage objective not yet met)
 - **Build**: tsup (ESM, minified)
 
 ## Database Schema
@@ -201,7 +203,7 @@ pnpm lint         # ESLint check
 pnpm format       # Prettier format
 
 # Database
-pnpm db:push      # Push schema changes
+pnpm --filter @hypercord/bot db:migrate  # Apply committed migrations
 pnpm db:studio    # Open Drizzle Studio
 pnpm db:generate  # Generate migrations
 ```
@@ -263,14 +265,13 @@ ADMIN_ROLE_IDS=role1,role2
 ### Docker (Recommended)
 
 ```bash
-# Production stack with all services
-docker-compose up -d
+# Review DOCKER.md and provide secrets before deployment
+docker compose up --build -d
 
 # View logs
-docker-compose logs -f
+docker compose logs -f
 
-# Scale if needed
-docker-compose up -d --scale bot=2
+# Multiple bot replicas are not supported until sharding and job ownership are verified
 ```
 
 ### Manual Deployment
@@ -304,11 +305,11 @@ sudo systemctl start hypercord
 ## Statistics
 
 - **25 database tables** (most comprehensive Discord bot)
-- **43+ commands** (growing library)
-- **118 tests** (100% passing)
-- **11 event handlers** (full Discord coverage)
+- **36 command modules** in the source catalog
+- **123 tests** passing in the verified CI baseline
+- **9 event modules** in the source catalog
 - **4 AI providers** (unprecedented flexibility)
-- **24.63 KB bundle** (optimized production build)
+- **Production bundle** verified against the command and event catalog
 - **3 background queues** (async processing)
 
 ## Why Self-Host?
@@ -324,8 +325,8 @@ sudo systemctl start hypercord
 **vs Building from Scratch:**
 - ✅ Save 100+ hours of development
 - ✅ Battle-tested architecture
-- ✅ Complete test coverage
-- ✅ Production-ready
+- Test coverage remains below the target; see issue #9
+- Deployment and lifecycle verification remains open; see issues #12–#15
 - ✅ Extensive documentation
 
 ## Contributing
@@ -334,7 +335,7 @@ See [TESTING.md](./apps/bot/TESTING.md) for development guidelines.
 
 ## License
 
-MIT License - See LICENSE file
+License declaration is pending; no LICENSE file is currently committed.
 
 ## Support
 

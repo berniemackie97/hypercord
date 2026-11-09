@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { env } from "../config.js";
+import { env, envSchema } from "../config.js";
 
 describe("Config", () => {
   it("should export parsed environment variables", () => {
@@ -32,5 +32,31 @@ describe("Config", () => {
     expect(typeof env.CLIENT_ID).toBe("string");
     expect(typeof env.DATABASE_URL).toBe("string");
     expect(typeof env.REDIS_URL).toBe("string");
+  });
+});
+
+describe("Environment validation", () => {
+  const valid = {
+    BOT_TOKEN: "bot-token",
+    CLIENT_ID: "application-id",
+    DATABASE_URL: "postgresql://user:password@localhost:5432/hypercord",
+    REDIS_URL: "redis://localhost:6379",
+  };
+
+  it.each(["BOT_TOKEN", "CLIENT_ID", "DATABASE_URL", "REDIS_URL"])(
+    "rejects a blank %s",
+    (key) => {
+      expect(envSchema.safeParse({ ...valid, [key]: "  " }).success).toBe(false);
+    }
+  );
+
+  it("trims allowlist IDs and ignores empty entries", () => {
+    const result = envSchema.parse({
+      ...valid,
+      ADMIN_USER_IDS: " 123, , 456 ",
+      ADMIN_ROLE_IDS: " ",
+    });
+    expect(result.ADMIN_USER_IDS).toEqual(["123", "456"]);
+    expect(result.ADMIN_ROLE_IDS).toEqual([]);
   });
 });
