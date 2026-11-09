@@ -1,7 +1,7 @@
 # Contributing to Hypercord
 
 ## Issue triage
-Use a bug report for observed defects, a feature proposal for user-facing changes, and an engineering task for operational or architectural work. Link existing epics, identify blocking issues, and describe acceptance criteria. Do not create duplicate tracking work.
+Use a bug report for observed defects, a feature proposal for user-facing changes, and an engineering task for operational or architectural work. Link existing epics, identify blocking issues, and describe acceptance criteria. Do not create duplicate tracking work. The [Hypercord Roadmap](https://github.com/users/berniemackie97/projects/8) is the planning board; repository issues and milestones remain the durable technical record.
 
 ## Change workflow
 1. Start from the current default branch and create a focused branch.
@@ -12,14 +12,14 @@ Use a bug report for observed defects, a feature proposal for user-facing change
 6. Request review and resolve blocking findings before merge. Never bypass a required check without documenting an explicit exception.
 
 ## Local tooling
-Use the workspace's declared Node.js and pnpm toolchain. After restoring the CI toolchain, these are the intended root commands:
+Use the workspace's declared Node.js and pnpm toolchain. CI currently verifies a frozen workspace install, lint, production bundle, migrations, image build and the measured coverage regression floor. The complete source typecheck, formatting gate and target coverage are still tracked in [#9](https://github.com/berniemackie97/hypercord/issues/9):
 
 ```sh
 corepack enable
 pnpm install --frozen-lockfile
 pnpm build
 pnpm lint
-pnpm test
+pnpm --filter @hypercord/bot test:coverage
 pnpm format
 ```
 
