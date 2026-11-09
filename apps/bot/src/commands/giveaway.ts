@@ -1,4 +1,6 @@
-import { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
+import { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, TextChannel } from "discord.js";
+import { eq } from "drizzle-orm";
+import { client } from "../core/client.js";
 import { z } from "zod";
 import { createCommand } from "../core/commandBuilder.js";
 import { loggingMiddleware, permissionMiddleware, guildOnlyMiddleware } from "../core/middleware.js";
@@ -58,7 +60,12 @@ export const { data, execute } = createCommand(commandData)
       .setFooter({ text: `Hosted by ${interaction.user.tag}` })
       .setTimestamp(endsAt);
 
-    const message = await interaction.channel!.send({ embeds: [embed] });
+    const channel = interaction.channel;
+    if (!(channel instanceof TextChannel)) {
+      await interaction.editReply({ content: "Giveaways require a server text channel." });
+      return;
+    }
+    const message = await channel.send({ embeds: [embed] });
     await message.react("🎉");
 
     // Save to database
@@ -95,8 +102,8 @@ async function endGiveaway(messageId: string, guildId: string) {
   if (!giveaway) return;
 
   try {
-    const channel = await (global as any).client.channels.fetch(giveaway.channelId);
-    if (!channel || !channel.isTextBased()) return;
+    const channel = await client.channels.fetch(giveaway.channelId);
+    if (!(channel instanceof TextChannel)) return;
 
     const message = await channel.messages.fetch(messageId);
     const reaction = message.reactions.cache.get("🎉");
@@ -128,7 +135,7 @@ async function endGiveaway(messageId: string, guildId: string) {
     await db
       .update(giveaways)
       .set({ ended: true, winnerIds })
-      .where((g) => g.id === giveaway.id);
+      .where(eq(giveaways.id, giveaway.id));
   } catch (err) {
     console.error("Error ending giveaway:", err);
   }

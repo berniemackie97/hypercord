@@ -1,6 +1,7 @@
 import { Events, type Client } from "discord.js";
 import { db } from "../db/index.js";
 import { guilds } from "../db/schema.js";
+import { sql } from "drizzle-orm";
 import { log } from "../core/logger.js";
 import { queues } from "../queue/index.js";
 
@@ -26,8 +27,8 @@ export async function execute(client: Client) {
         .onConflictDoUpdate({
           target: guilds.id,
           set: {
-            name: db.raw("excluded.name"),
-            ownerId: db.raw("excluded.owner_id"),
+            name: sql`excluded.name`,
+            ownerId: sql`excluded.owner_id`,
             isActive: true,
             leftAt: null,
             updatedAt: new Date(),

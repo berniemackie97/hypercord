@@ -30,7 +30,7 @@ export async function execute(message: Message | PartialMessage) {
     log.error(
       {
         err,
-        guild: message.guild.id,
+        guild: message.guildId,
         messageId: message.id,
       },
       "failed to cache deleted message"

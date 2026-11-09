@@ -10,8 +10,10 @@ import {
 import { log } from "./logger.js";
 import { env } from "./config.js";
 
+export type CommandDefinition = Pick<SlashCommandBuilder, "name" | "description" | "toJSON">;
+
 export type Command = {
-  data: SlashCommandBuilder;
+  data: CommandDefinition;
   execute: (i: ChatInputCommandInteraction) => Promise<void>;
 };
 

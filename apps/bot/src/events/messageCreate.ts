@@ -174,10 +174,13 @@ export async function execute(message: Message) {
     );
 
     if (userMessages.size > 0) {
-      await message.channel.bulkDelete(userMessages).catch(() => {
-        // If bulk delete fails, try individual deletes
-        userMessages.forEach((msg) => msg.delete().catch(() => {}));
-      });
+      if ("bulkDelete" in message.channel) {
+        await message.channel.bulkDelete(userMessages).catch(async () => {
+          await Promise.allSettled(userMessages.map((msg) => msg.delete()));
+        });
+      } else {
+        await Promise.allSettled(userMessages.map((msg) => msg.delete()));
+      }
     }
 
     // Log to audit
@@ -262,7 +265,9 @@ async function handleXPGain(message: Message) {
       .setFooter({ text: "Keep chatting to level up!" })
       .setTimestamp();
 
-    await message.channel.send({ embeds: [embed] }).catch(() => {});
+    if ("send" in message.channel) {
+      await message.channel.send({ embeds: [embed] }).catch(() => {});
+    }
   }
 }
 
@@ -402,7 +407,7 @@ async function handleAIMention(message: Message) {
   }
 
   // Check quota
-  const hasQuota = await checkQuota(message.author.id, message.guild.id, aiConfig.provider, aiConfig.monthlyLimit);
+  const hasQuota = await checkQuota(message.author.id, message.guild.id, aiConfig.provider, aiConfig.monthlyLimit ?? undefined);
   if (!hasQuota) {
     await message.reply({
       content: `❌ You've exceeded your monthly quota for ${aiConfig.provider}. Check \`/ai-quota\` for details.`,
@@ -422,7 +427,9 @@ async function handleAIMention(message: Message) {
   }
 
   // Show typing indicator
-  await message.channel.sendTyping();
+  if ("sendTyping" in message.channel) {
+    await message.channel.sendTyping();
+  }
 
   try {
     // Call AI service
