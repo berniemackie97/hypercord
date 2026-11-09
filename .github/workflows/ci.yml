@@ -2,24 +2,32 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
   pull_request:
-    branches: [main, develop]
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
-    name: Test & Build
-    runs-on: ubuntu-latest
+    name: Validate workspace
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
 
     services:
       postgres:
-        image: postgres:16
+        image: postgres:16-alpine
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: hypercord_test
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U postgres -d hypercord_test"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -37,47 +45,42 @@ jobs:
           - 6379:6379
 
     steps:
-      - name: Checkout code
+      - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
-          cache: "npm"
+          node-version: "22.16.0"
+          cache: pnpm
 
-      - name: Install dependencies
-        run: npm ci
-        working-directory: ./apps/bot
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Lint
-        run: npm run lint
-        working-directory: ./apps/bot
+        run: pnpm lint
 
-      - name: Type check
-        run: npm run build
-        working-directory: ./apps/bot
+      - name: Build
+        run: pnpm build
 
-      - name: Run tests with coverage
-        run: npm run test:coverage
-        working-directory: ./apps/bot
+      - name: Tests with coverage
+        run: pnpm --filter @hypercord/bot test:coverage
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/hypercord_test
           REDIS_URL: redis://localhost:6379
           BOT_TOKEN: test-token
           CLIENT_ID: test-client-id
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
+      - name: Publish coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          files: ./apps/bot/coverage/lcov.info
-          flags: unittests
-          name: codecov-umbrella
-          fail_ci_if_error: false
-
-      - name: Comment coverage on PR
-        if: github.event_name == 'pull_request'
-        uses: romeovs/lcov-reporter-action@v0.3.1
-        with:
-          lcov-file: ./apps/bot/coverage/lcov.info
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          name: coverage
+          path: apps/bot/coverage/lcov.info
+          if-no-files-found: ignore
+          retention-days: 7

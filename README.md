@@ -3,7 +3,6 @@
 **The most advanced, feature-rich Discord bot you can self-host.**
 
 [![Tests](https://img.shields.io/badge/tests-118%20passing-success)](./apps/bot/TESTING.md)
-[![Coverage](https://img.shields.io/badge/coverage-100%25-success)](./)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)](./)
 [![Discord.js](https://img.shields.io/badge/discord.js-14.22-5865F2)](./)
 

@@ -1,6 +1,5 @@
 import type { SlashCommandBuilder, ChatInputCommandInteraction } from "discord.js";
-import type { Middleware } from "./middleware.js";
-import { executeMiddleware, errorHandlerMiddleware } from "./middleware.js";
+import { executeMiddleware, errorHandlerMiddleware, type Middleware } from "./middleware.js";
 
 /**
  * Enhanced command interface with middleware support
