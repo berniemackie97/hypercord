@@ -1,4 +1,4 @@
-FROM node:22.16.0-alpine AS base
+FROM node:26.13.0-alpine AS base
 WORKDIR /app
 RUN corepack enable
 
@@ -16,7 +16,7 @@ RUN pnpm --filter @hypercord/bot build
 FROM base AS production-dependencies
 RUN pnpm install --frozen-lockfile --prod --filter @hypercord/bot
 
-FROM node:22.16.0-alpine AS production
+FROM node:26.13.0-alpine AS production
 ENV NODE_ENV=production
 WORKDIR /app/apps/bot
 RUN apk add --no-cache dumb-init
