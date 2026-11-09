@@ -1,32 +1,34 @@
 # Contributing to Hypercord
 
-## Issue triage
-Use a bug report for observed defects, a feature proposal for user-facing changes, and an engineering task for operational or architectural work. Link existing epics, identify blocking issues, and describe acceptance criteria. Do not create duplicate tracking work. The [Hypercord Roadmap](https://github.com/users/berniemackie97/projects/8) is the planning board; repository issues and milestones remain the durable technical record.
+## Planning and triage
+
+The [Hypercord Roadmap](https://github.com/users/berniemackie97/projects/8) is the planning board; repository issues and milestones hold technical acceptance evidence. Use bug, feature and engineering issue forms, reference existing work, identify dependencies and state verification criteria before implementation.
 
 ## Change workflow
-1. Start from the current default branch and create a focused branch.
-2. Audit the relevant code and tests before making changes. Document the failure or behavior contract.
-3. Implement one coherent, reviewable change; related issues may be completed in one PR if they share a bounded regression surface.
-4. Add or update tests for normal behavior, failure paths, concurrency, permissions and durable state where relevant.
-5. Run the checks below and report exact results in the PR template. Do not claim a check passed without executing it.
-6. Request review and resolve blocking findings before merge. Never bypass a required check without documenting an explicit exception.
 
-## Local tooling
-Use the workspace's declared Node.js and pnpm toolchain. CI currently verifies a frozen workspace install, lint, production bundle, migrations, image build and the measured coverage regression floor. The complete source typecheck, formatting gate and target coverage are still tracked in [#9](https://github.com/berniemackie97/hypercord/issues/9):
+1. Audit existing code, tests and live project dependencies before selecting a ready issue.
+2. Implement a coherent change with tests covering normal behavior and relevant failures, concurrency and authorization.
+3. Use the workspace's pinned pnpm toolchain; commit only source and intentionally shared configuration.
+4. Run the project checks and record exact outcomes in the PR. Never claim tests or recovery scenarios were exercised without evidence.
+5. Resolve blocking review feedback and CI failures before merging. Do not suppress checks, rewrite history or mark issues complete without the required evidence.
 
-```sh
+## Local checks
+
+```bash
 corepack enable
 pnpm install --frozen-lockfile
-pnpm build
+pnpm typecheck
 pnpm lint
+pnpm build
 pnpm --filter @hypercord/bot test:coverage
-pnpm format
 ```
 
-The tracked engineering issues are the source of truth for CI and toolchain defects; commands above do not imply all current checks pass.
+The full-repository formatting gate and 80% test-coverage objective remain tracked in [Issue #9](https://github.com/berniemackie97/hypercord/issues/9). Avoid interpreting the measured CI regression floors as release acceptance.
 
-## Database and deployment changes
-Review transaction boundaries and idempotency for all state mutations. Schema changes require committed migrations, forward/rollback testing, and a recovery plan. Deployment changes require a clean build, startup, health, shutdown and restart verification.
+## Schema and deployment changes
 
-## Security and privacy
-Apply least privilege to Discord and infrastructure access. Do not check in API keys, secrets, tokens, private messages or personal local configuration. Follow [SECURITY.md](SECURITY.md) for private vulnerability reports.
+Include committed migrations, idempotency checks and rollback/recovery plans for persistent state. Verify container build, startup, readiness, shutdown and restart separately; a passing image build is not proof of an authenticated Discord deployment.
+
+## Security
+
+Do not commit API credentials, tokens, private message content, or personal machine settings. Pull requests must pass dependency review and secret scanning; see [SECURITY.md](SECURITY.md) for private reporting and credential rotation requirements.

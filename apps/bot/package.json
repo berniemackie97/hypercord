@@ -7,7 +7,7 @@
   "private": true,
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsup src/index.ts --dts --format esm --minify",
+    "build": "tsup src/index.ts --dts --format esm --minify --metafile && node scripts/verify-bundle.mjs",
     "start": "node dist/index.js",
     "register": "tsx scripts/register-commands.ts",
     "watch:register": "chokidar \"src/commands/**/*.{ts,js}\" -c \"pnpm run register\"",
@@ -22,7 +22,8 @@
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
     "format": "prettier --check .",
-    "format:write": "prettier --write ."
+    "format:write": "prettier --write .",
+    "typecheck": "tsc --noEmit --project tsconfig.typecheck.json"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",

@@ -1,5 +1,7 @@
 import { Events, type Message, PermissionFlagsBits, EmbedBuilder } from "discord.js";
 import { log } from "../core/logger.js";
+import { env } from "../core/config.js";
+import { hasRequiredAiRole } from "../core/aiRole.js";
 import { getGuildConfig } from "../core/guildConfig.js";
 import { createAuditLog } from "../core/audit.js";
 import { addXP, calculateMessageXP } from "../utils/leveling.js";
@@ -60,10 +62,11 @@ export async function execute(message: Message) {
   // Ignore bots and DMs
   if (message.author.bot || !message.guild) return;
 
-  // Cache message for snipe command (non-blocking)
-  cacheMessage(message).catch((err) => {
-    log.error({ err, guild: message.guild?.id, messageId: message.id }, "failed to cache message");
-  });
+  if (env.MESSAGE_CONTENT_ENABLED) {
+    cacheMessage(message).catch((err) => {
+      log.error({ err, guild: message.guild?.id, messageId: message.id }, "failed to cache message");
+    });
+  }
 
   // Check and clear AFK status (non-blocking)
   handleAFKStatus(message).catch((err) => {
@@ -80,7 +83,8 @@ export async function execute(message: Message) {
     log.error({ err, guild: message.guild?.id, messageId: message.id }, "failed to handle AI mention");
   });
 
-  // Handle XP gain (non-blocking)
+  if (!env.MESSAGE_CONTENT_ENABLED) return;
+
   handleXPGain(message).catch((err) => {
     log.error({ err, guild: message.guild?.id, user: message.author.id }, "failed to add XP");
   });
@@ -170,10 +174,13 @@ export async function execute(message: Message) {
     );
 
     if (userMessages.size > 0) {
-      await message.channel.bulkDelete(userMessages).catch(() => {
-        // If bulk delete fails, try individual deletes
-        userMessages.forEach((msg) => msg.delete().catch(() => {}));
-      });
+      if ("bulkDelete" in message.channel) {
+        await message.channel.bulkDelete(userMessages).catch(async () => {
+          await Promise.allSettled(userMessages.map((msg) => msg.delete()));
+        });
+      } else {
+        await Promise.allSettled(userMessages.map((msg) => msg.delete()));
+      }
     }
 
     // Log to audit
@@ -258,7 +265,9 @@ async function handleXPGain(message: Message) {
       .setFooter({ text: "Keep chatting to level up!" })
       .setTimestamp();
 
-    await message.channel.send({ embeds: [embed] }).catch(() => {});
+    if ("send" in message.channel) {
+      await message.channel.send({ embeds: [embed] }).catch(() => {});
+    }
   }
 }
 
@@ -388,8 +397,7 @@ async function handleAIMention(message: Message) {
 
   // Check role requirements if set
   if (aiConfig.requiredRole) {
-    const member = await message.guild.members.fetch(message.user.id).catch(() => null);
-    if (!member || !member.roles.cache.has(aiConfig.requiredRole)) {
+    if (!(await hasRequiredAiRole(message, aiConfig.requiredRole))) {
       await message.reply({
         content: "❌ You don't have the required role to use AI in this channel.",
         allowedMentions: { users: [] },
@@ -399,7 +407,7 @@ async function handleAIMention(message: Message) {
   }
 
   // Check quota
-  const hasQuota = await checkQuota(message.author.id, message.guild.id, aiConfig.provider, aiConfig.monthlyLimit);
+  const hasQuota = await checkQuota(message.author.id, message.guild.id, aiConfig.provider, aiConfig.monthlyLimit ?? undefined);
   if (!hasQuota) {
     await message.reply({
       content: `❌ You've exceeded your monthly quota for ${aiConfig.provider}. Check \`/ai-quota\` for details.`,
@@ -419,7 +427,9 @@ async function handleAIMention(message: Message) {
   }
 
   // Show typing indicator
-  await message.channel.sendTyping();
+  if ("sendTyping" in message.channel) {
+    await message.channel.sendTyping();
+  }
 
   try {
     // Call AI service
@@ -454,6 +464,15 @@ async function handleAIMention(message: Message) {
 async function resolveAIConfig(message: Message): Promise<(AIConfig & { requiredRole?: string; monthlyLimit?: number | null }) | null> {
   if (!message.guild) return null;
 
+  const channelConfig = await db.query.aiChannelConfig.findFirst({
+    where: (c, { eq, and }) => and(
+      eq(c.guildId, message.guild!.id),
+      eq(c.channelId, message.channelId),
+      eq(c.enabled, true),
+    ),
+  });
+  const requiredRole = channelConfig?.requiredRole || undefined;
+
   // 1. Check user-level access
   const userAccess = await db.query.aiUserAccess.findFirst({
     where: (a, { eq, and }) => and(eq(a.userId, message.author.id), eq(a.guildId, message.guild!.id)),
@@ -468,15 +487,12 @@ async function resolveAIConfig(message: Message): Promise<(AIConfig & { required
         provider: userAccess.provider as "openai" | "anthropic" | "gemini" | "grok",
         model: userAccess.model,
         monthlyLimit: userAccess.monthlyLimit,
+        requiredRole,
       };
     }
   }
 
   // 2. Check channel-level config
-  const channelConfig = await db.query.aiChannelConfig.findFirst({
-    where: (c, { eq, and }) => and(eq(c.guildId, message.guild!.id), eq(c.channelId, message.channelId), eq(c.enabled, true)),
-  });
-
   if (channelConfig) {
     return {
       provider: channelConfig.provider as "openai" | "anthropic" | "gemini" | "grok",

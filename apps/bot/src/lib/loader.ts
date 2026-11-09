@@ -1,43 +1,52 @@
-import { readdirSync } from "node:fs";
-import { fileURLToPath, pathToFileURL } from "node:url";
-import path from "node:path";
+import type { Client } from "discord.js";
 import { commands } from "../core/client.js";
 import { log } from "../core/logger.js";
+import { commandModules, eventModules } from "./catalog.js";
 
-/**
- * Dynamic ESM loader that works cross-platform and with tsx.
- * Loads both .ts and .js files (dev vs build).
- */
-export async function loadCommands() {
-  const base = new URL("../commands/", import.meta.url);
-  const dirPath = fileURLToPath(base);
-  const files = readdirSync(dirPath).filter((f) => /\.(ts|js)$/.test(f));
-
+export async function loadCommands(): Promise<void> {
   commands.clear();
-  for (const f of files) {
-    const modUrl = new URL(f, base); // safe URL join
-    const mod = await import(modUrl.href);
-    if (!mod?.data || !mod?.execute) continue;
 
-    const name = mod.data.name;
-    if (commands.has(name)) {
-      log.warn({ name, file: f }, "duplicate command name");
+  for (const command of commandModules) {
+    if (!command.data?.name || typeof command.execute !== "function") {
+      throw new Error("Command catalog contains an invalid command");
     }
-    commands.set(name, { data: mod.data, execute: mod.execute });
+    if (commands.has(command.data.name)) {
+      throw new Error(`Duplicate command: ${command.data.name}`);
+    }
+    commands.set(command.data.name, { data: command.data, execute: command.execute });
   }
+
   log.info({ count: commands.size }, "commands loaded");
 }
 
-export async function loadEvents(client: any) {
-  const base = new URL("../events/", import.meta.url);
-  const dirPath = fileURLToPath(base);
-  const files = readdirSync(dirPath).filter((f) => /\.(ts|js)$/.test(f));
+export async function loadEvents(client: Pick<Client, "on" | "once">): Promise<void> {
+  const names = new Set<string>();
 
-  for (const f of files) {
-    const modUrl = new URL(f, base);
-    const mod = await import(modUrl.href);
-    if (mod?.once) client.once(mod.name, (...args: any[]) => mod.execute(...args));
-    else client.on(mod.name, (...args: any[]) => mod.execute(...args));
+  for (const event of eventModules) {
+    if (!event.name || typeof event.execute !== "function") {
+      throw new Error("Event catalog contains an invalid handler");
+    }
+    if (names.has(event.name)) {
+      throw new Error(`Duplicate event handler: ${event.name}`);
+    }
+    names.add(event.name);
+
+    const listener = (...args: unknown[]) => {
+      try {
+        Promise.resolve((event.execute as (...args: unknown[]) => unknown)(...args)).catch(
+          (error) => log.error({ error, event: event.name }, "event handler failed")
+        );
+      } catch (error) {
+        log.error({ error, event: event.name }, "event handler failed");
+      }
+    };
+
+    if ("once" in event && event.once) {
+      client.once(event.name, listener);
+    } else {
+      client.on(event.name, listener);
+    }
   }
-  log.info({ count: files.length }, "events loaded");
+
+  log.info({ count: names.size }, "events loaded");
 }

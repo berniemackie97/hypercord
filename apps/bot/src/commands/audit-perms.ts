@@ -1,8 +1,7 @@
-import { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } from "discord.js";
+import { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, type ChatInputCommandInteraction } from "discord.js";
 import { createCommand } from "../core/commandBuilder.js";
-import { loggingMiddleware, permissionMiddleware, guildOnlyMiddleware } from "../core/middleware.js";
+import { loggingMiddleware, guildOnlyMiddleware } from "../core/middleware.js";
 import { rateLimitMiddleware } from "../core/rateLimiter.js";
-import type { ChatInputCommandInteraction } from "discord.js";
 import { env } from "../core/config.js";
 
 /**

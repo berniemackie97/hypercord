@@ -20,6 +20,7 @@
     "bot:up": "docker compose -f apps/bot/docker-compose.yaml up -d",
     "bot:down": "docker compose -f apps/bot/docker-compose.yaml down",
     "bot:dev:hot": "pnpm -F @hypercord/bot run dev:hot",
-    "bot:up-all": "pnpm run bot:up && pnpm run bot:db && pnpm run bot:dev:hot"
+    "bot:up-all": "pnpm run bot:up && pnpm run bot:db && pnpm run bot:dev:hot",
+    "typecheck": "pnpm -F @hypercord/bot run typecheck && pnpm -F @hypercord/shared run typecheck"
   }
 }

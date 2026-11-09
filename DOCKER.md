@@ -1,232 +1,70 @@
-# 🐳 Docker Deployment Guide
+# Hypercord container deployment
 
-Enterprise-grade Docker setup for Hypercord Discord Bot.
+The Compose stack runs PostgreSQL, Redis, a one-shot schema migration task, and the Discord bot. Only the bot can reach Discord. The database and Redis are not exposed on host ports in the default stack.
 
-## Quick Start
+## Requirements
 
-### Development
+- Docker Engine with Compose v2
+- A valid Discord bot token and application ID
+- Unique PostgreSQL and Redis credentials
+- Network access to Discord and any enabled AI provider
 
-```bash
-# 1. Copy environment file
-cp .env.example .env
+## Configuration
 
-# 2. Edit .env and add your Discord bot token
-# BOT_TOKEN=your_token_here
-# APPLICATION_ID=your_app_id_here
+Copy `.env.example` to `.env` at the repository root. Replace **every** placeholder, including `POSTGRES_PASSWORD`, `REDIS_PASSWORD`, `BOT_TOKEN` and `CLIENT_ID`. The credentials embedded in `DATABASE_URL` and `REDIS_URL` must match the service passwords; URL-encode reserved characters in URL passwords. The hostnames `postgres` and `redis` resolve **inside** the Compose network.
 
-# 3. Start all services (PostgreSQL + Redis + Bot + Tools)
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+Do not commit `.env` or place credentials in image build arguments. Docker environment variables and process arguments remain visible to users with container administration rights. Use an appropriate secret-management system and controlled Docker host access for production.
 
-# 4. Run database migrations
-docker-compose exec bot pnpm db:migrate
-
-# 5. Access admin tools:
-# - pgAdmin: http://localhost:5050 (admin@hypercord.local / admin)
-# - Redis Commander: http://localhost:8081
-```
-
-### Production
+## Build and start
 
 ```bash
-# 1. Set production environment variables in .env
-# NODE_ENV=production
-# LOG_LEVEL=info
-# Update DATABASE_URL and REDIS_URL with production credentials
-
-# 2. Build and start
-docker-compose up -d
-
-# 3. Check logs
-docker-compose logs -f bot
-
-# 4. Check health
-docker-compose ps
+docker compose config --quiet
+docker compose build
+docker compose up -d
+docker compose ps
+docker compose logs --tail=100 migrate bot
 ```
 
-## Architecture
+Compose waits for PostgreSQL and Redis container health and for the **migrate** task to finish successfully before starting the bot. Migrations use the checked-in Drizzle SQL files; they do not run as an image-build step or inside bot startup.
 
-### Services
+The migration container exits after applying migrations. Re-running `docker compose run --rm migrate` should not apply already-recorded migrations again. Take a verified database backup before deploying schema changes; migration execution is not a substitute for a rollback plan.
 
-| Service | Port | Description |
-|---------|------|-------------|
-| **bot** | - | Discord bot application |
-| **postgres** | 5432 | PostgreSQL 16 database |
-| **redis** | 6379 | Redis cache & queue |
-| **pgadmin** | 5050 | Database management (dev only) |
-| **redis-commander** | 8081 | Redis management (dev only) |
+The bot image uses a repository-root build context, a frozen pnpm installation, a non-root runtime user, and runtime dependencies only. The bot process starts with `node dist/index.js`. No HTTP listener is currently implemented. No HTTP health endpoint or Docker bot healthcheck is advertised; operational readiness and shutdown guarantees remain open in Issues #14, #15 and #36. Use bot logs and the Discord gateway state to diagnose startup until those issues are completed.
 
-### Multi-Stage Dockerfile
+## Discord Gateway permissions
 
-**Stage 1: Dependencies**
-- Installs all dependencies using pnpm
-- Cached for faster rebuilds
+Hypercord always subscribes to Guilds and GuildMessages events. GuildMembers is a privileged intent required by its member lifecycle and permission-audit features. Enable Guild Members on the application's **Bot → Privileged Gateway Intents** page in the Discord Developer Portal before startup.
 
-**Stage 2: Builder**
-- Generates Drizzle migrations
-- Builds TypeScript to JavaScript
-- Runs tsup bundler
+Full message-content processing is **off by default**. Set `MESSAGE_CONTENT_ENABLED=true` only when the application's Message Content privileged intent has been enabled and, where required, approved by Discord. If the flag is enabled without portal access, Discord can reject the connection with `DisallowedIntents`. With the flag disabled, XP from messages, automated message-content spam scanning, and snipe-content caching are disabled. Guild-message events, AFK metadata, and direct bot mentions remain available; Discord's documented bot-mention exception permits mention content without the broad Message Content intent.
 
-**Stage 3: Production**
-- Minimal Alpine Linux image
-- Non-root user (nodejs:1001)
-- Only production dependencies
-- Healthcheck included
-- Dumb-init for signal handling
+The bot requests message partials and records deletion timestamps for cached message IDs even when their bodies are unavailable; message edits with unavailable old or new content are ignored. Broad message-content storage and retention controls remain outstanding in #33 and #37.
 
-### Volume Mounts
+## Local development
 
-- `postgres_data`: PostgreSQL data persistence
-- `redis_data`: Redis AOF persistence
-- `pgadmin_data`: pgAdmin settings
-
-## Commands
-
-### Database
+The development override exposes PostgreSQL and Redis only on the loopback interface and runs the bot through `tsx` with a read-only source mount:
 
 ```bash
-# Generate Drizzle migrations
-docker-compose exec bot pnpm db:generate
-
-# Apply migrations
-docker-compose exec bot pnpm db:migrate
-
-# Push schema changes (development)
-docker-compose exec bot pnpm db:push
-
-# Open Drizzle Studio
-docker-compose exec bot pnpm db:studio
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
 
-### Bot Management
+The root `.env` still uses Compose hostnames. When running the bot directly on the host, instead use `apps/bot/.env.example` as a starting point for `apps/bot/.env`, with `localhost` addresses and matching database/Redis credentials.
+
+## Verification
 
 ```bash
-# View logs
-docker-compose logs -f bot
-
-# Restart bot
-docker-compose restart bot
-
-# Rebuild bot
-docker-compose up -d --build bot
-
-# Execute command in bot container
-docker-compose exec bot sh
-
-# Check bot health
-docker-compose exec bot node -e "console.log('healthy')"
+pnpm install --frozen-lockfile
+pnpm typecheck
+pnpm build
+pnpm lint
+pnpm --filter @hypercord/bot test:coverage
 ```
 
-### Cleanup
+CI checks the packaged command and event catalog, runs migrations twice against a disposable database, validates Compose and builds the production image. These checks do not substitute for an authenticated end-to-end Discord deployment or a database recovery exercise.
 
-```bash
-# Stop all services
-docker-compose down
+## Operational notes
 
-# Stop and remove volumes (WARNING: Deletes all data)
-docker-compose down -v
-
-# Remove images
-docker-compose down --rmi all
-```
-
-## Environment Variables
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `BOT_TOKEN` | ✅ | - | Discord bot token |
-| `CLIENT_ID` | ✅ | - | Discord application ID |
-| `DATABASE_URL` | ✅ | - | PostgreSQL connection string |
-| `REDIS_URL` | ✅ | - | Redis connection string |
-| `GEMINI_API_KEY` | ❌ | - | Google Gemini API (FREE unlimited) |
-| `OPENAI_API_KEY` | ❌ | - | OpenAI GPT API |
-| `ANTHROPIC_API_KEY` | ❌ | - | Anthropic Claude API |
-| `GROK_API_KEY` | ❌ | - | Grok AI API |
-| `NODE_ENV` | ❌ | `development` | Environment mode |
-| `LOG_LEVEL` | ❌ | `info` | Logging level |
-| `ADMIN_USER_IDS` | ❌ | - | Comma-separated admin user IDs |
-| `ADMIN_ROLE_IDS` | ❌ | - | Comma-separated admin role IDs |
-
-## Production Checklist
-
-- [ ] Change default PostgreSQL password
-- [ ] Change default Redis password
-- [ ] Set `NODE_ENV=production`
-- [ ] Set `LOG_LEVEL=info` or `warn`
-- [ ] Use strong credentials
-- [ ] Configure backup strategy
-- [ ] Set up monitoring/alerts
-- [ ] Review resource limits
-- [ ] Test health checks
-- [ ] Configure log rotation
-- [ ] Set up reverse proxy (if using HTTP health endpoint)
-- [ ] Review security groups/firewall rules
-
-## Troubleshooting
-
-### Bot won't start
-
-```bash
-# Check logs
-docker-compose logs bot
-
-# Check database connection
-docker-compose exec postgres psql -U hypercord -d hypercord -c "SELECT 1"
-
-# Verify environment variables
-docker-compose exec bot env | grep -E 'BOT_TOKEN|DATABASE_URL|REDIS_URL'
-```
-
-### Database connection failed
-
-```bash
-# Check PostgreSQL is running
-docker-compose ps postgres
-
-# Check PostgreSQL logs
-docker-compose logs postgres
-
-# Test connection manually
-docker-compose exec postgres psql -U hypercord -d hypercord -c "SELECT 1"
-```
-
-### Redis connection failed
-
-```bash
-# Check Redis is running
-docker-compose ps redis
-
-# Check Redis logs
-docker-compose logs redis
-
-# Test connection
-docker-compose exec redis redis-cli -a dev_redis_password ping
-```
-
-## Performance Tuning
-
-### PostgreSQL
-
-Connection pooling is configured in `DATABASE_URL`:
-- `connection_limit=5` (dev) / `10` (prod)
-- `pool_timeout=20` (dev) / `30` (prod)
-
-### Redis
-
-- AOF persistence enabled for data durability
-- Password protected
-- Can add `maxmemory` policies if needed
-
-### Bot
-
-- Multi-stage build reduces image size
-- Non-root user for security
-- Dumb-init for proper signal handling
-- Health checks for orchestration
-
-## Next Steps
-
-1. **Monitoring**: Add Prometheus + Grafana
-2. **Logging**: Ship logs to ELK/Loki
-3. **Backups**: Automate database backups
-4. **Scaling**: Use Docker Swarm or Kubernetes
-5. **CI/CD**: Automate builds and deployments
+- Run one bot replica until Discord sharding, worker ownership and idempotent job processing have been verified.
+- Use `docker compose logs bot` and `docker compose logs migrate` to investigate failures; never print environment variables containing secrets.
+- PostgreSQL data lives in `postgres_data` and Redis AOF data in `redis_data`. `docker compose down -v` **destroys** both volumes.
+- On SIGTERM or SIGINT, the bot waits for in-flight BullMQ workers to finish before closing queues, Redis, the Discord client and PostgreSQL. The application has a 25-second shutdown deadline; Compose allows 30 seconds before a forced stop. Failed cleanup produces a nonzero exit status. Delivery guarantees and interrupted-job reconciliation are tracked separately.
+- Stop the stack with `docker compose down`; backup/restore and health monitoring remain separately tracked work.

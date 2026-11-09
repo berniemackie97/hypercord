@@ -1,32 +1,30 @@
 import "dotenv/config";
 import { z } from "zod";
 
-// helper to split comma-separated IDs into string arrays
-const csv = z
-  .string()
-  .transform((s) =>
-    s
-      .split(",")
-      .map((x) => x.trim())
-      .filter(Boolean),
-  );
+const nonEmpty = z.string().trim().min(1);
+const commaSeparatedIds = z.string().transform((value) =>
+  value.split(",").map((id) => id.trim()).filter(Boolean)
+);
 
-const envSchema = z.object({
-  BOT_TOKEN: z.string().min(1),
-  CLIENT_ID: z.string().min(1),
-  GUILD_ID: z.string().optional(),
-  DATABASE_URL: z.string().min(1),
-  REDIS_URL: z.string().min(1),
-
-  // AI API Keys (optional - only needed if using that provider)
-  OPENAI_API_KEY: z.string().optional(),
-  ANTHROPIC_API_KEY: z.string().optional(),
-  GEMINI_API_KEY: z.string().optional(),
-  GROK_API_KEY: z.string().optional(),
-
-  // Optional allowlists for elevated commands
-  ADMIN_USER_IDS: z.preprocess((v) => (typeof v === "string" ? v : ""), csv).optional(),
-  ADMIN_ROLE_IDS: z.preprocess((v) => (typeof v === "string" ? v : ""), csv).optional(),
+export const envSchema = z.object({
+  BOT_TOKEN: nonEmpty,
+  CLIENT_ID: nonEmpty,
+  GUILD_ID: z.string().trim().optional(),
+  DATABASE_URL: nonEmpty,
+  REDIS_URL: nonEmpty,
+  MESSAGE_CONTENT_ENABLED: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
+  OPENAI_API_KEY: z.string().trim().optional(),
+  ANTHROPIC_API_KEY: z.string().trim().optional(),
+  GEMINI_API_KEY: z.string().trim().optional(),
+  GROK_API_KEY: z.string().trim().optional(),
+  ADMIN_USER_IDS: z.preprocess(
+    (value) => (typeof value === "string" ? value : ""),
+    commaSeparatedIds
+  ),
+  ADMIN_ROLE_IDS: z.preprocess(
+    (value) => (typeof value === "string" ? value : ""),
+    commaSeparatedIds
+  ),
 });
 
 export const env = envSchema.parse(process.env);

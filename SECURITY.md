@@ -1,14 +1,21 @@
 # Security policy
 
 ## Private reports
-Please report suspected vulnerabilities through [GitHub's private vulnerability reporting](https://github.com/berniemackie97/hypercord/security/advisories/new), not a public issue. Include a concise reproduction, affected version or commit, impact, and relevant logs with all credentials and personal data removed.
 
-If private vulnerability reporting is not enabled, contact the repository owner privately through an established channel rather than disclosing an exploit publicly.
+Please report suspected vulnerabilities through [GitHub private vulnerability reporting](https://github.com/berniemackie97/hypercord/security/advisories/new), not public issues. Include a concise reproduction, affected commit, impact and redacted evidence.
 
-## Scope
-Security-sensitive areas include Discord permissions and gateway intents, command authorization, credentials, provider API calls and billing, persisted message content, moderation, financial-style balances, database access and background jobs.
+If private vulnerability reporting is unavailable, contact the repository owner privately through an existing trusted channel. Never post live secrets or private message contents in issues, pull requests, or CI logs.
 
-## Handling
-The maintainer will assess reproducibility and impact, coordinate a fix and validation, and disclose information after remediation where appropriate. No response-time or supported-version guarantee is asserted until a release and support policy is published.
+## Credential handling
 
-Never include live tokens, database URLs containing credentials, or unredacted user content in reports.
+Secrets must be supplied through the deployment environment or an appropriate secret manager. Local tool permissions and machine-specific configuration must not be committed.
+
+Secret scanning runs for pull requests and pushes to `main`, including repository history. A scan cannot guarantee that no secret was ever exposed. If credentials have been published, revoke and rotate them; deleting a file from the current branch does not remove it from Git history or caches.
+
+Dependency review blocks newly introduced high- and critical-severity advisories. It does not prove that existing dependencies are vulnerability-free. Review Dependabot alerts, changes and supported fixes before releasing.
+
+## Scope and response
+
+Security-sensitive functionality includes Discord gateway intents and permissions, provider credentials and billing, message retention, moderation, financial-style balances, data storage and background workers.
+
+The maintainer assesses reports and coordinates remediation. No response-time or supported-version SLA is asserted until a release support policy has been established.

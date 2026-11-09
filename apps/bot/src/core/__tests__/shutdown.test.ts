@@ -1,49 +1,82 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { shutdownManager } from "../shutdown.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { ShutdownManager } from "../shutdown.js";
 
 describe("ShutdownManager", () => {
-  // Store original process.exit to restore it after tests
-  const originalExit = process.exit;
-
-  beforeEach(() => {
-    // Mock process.exit to prevent tests from actually exiting
-    process.exit = vi.fn() as any;
-  });
+  const originalExitCode = process.exitCode;
 
   afterEach(() => {
-    // Restore original process.exit
-    process.exit = originalExit;
+    process.exitCode = originalExitCode;
+    vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
-  describe("register", () => {
-    it("should register shutdown handlers", () => {
-      const handler = vi.fn();
-      shutdownManager.register(handler);
+  it("closes resources in registration order", async () => {
+    const closed: string[] = [];
+    const manager = new ShutdownManager();
 
-      // Handler should be registered (we'll verify in shutdown tests)
-      expect(handler).toBeDefined();
-    });
+    manager.register("workers", async () => { closed.push("workers"); });
+    manager.register("queues", async () => { closed.push("queues"); });
+    manager.register("database", async () => { closed.push("database"); });
 
-    it("should register multiple handlers", () => {
-      const handler1 = vi.fn();
-      const handler2 = vi.fn();
-      const handler3 = vi.fn();
+    await manager.shutdown("SIGTERM");
 
-      shutdownManager.register(handler1);
-      shutdownManager.register(handler2);
-      shutdownManager.register(handler3);
-
-      expect(handler1).toBeDefined();
-      expect(handler2).toBeDefined();
-      expect(handler3).toBeDefined();
-    });
+    expect(closed).toEqual(["workers", "queues", "database"]);
   });
 
-  describe("shutdown manager functionality", () => {
-    it("should be a defined instance", () => {
-      expect(shutdownManager).toBeDefined();
-      expect(typeof shutdownManager.register).toBe("function");
-      expect(typeof shutdownManager.shutdown).toBe("function");
-    });
+  it("runs handlers once on repeated shutdown requests", async () => {
+    const manager = new ShutdownManager();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const close = vi.fn(() => gate);
+    manager.register("workers", close);
+
+    const first = manager.shutdown("SIGTERM");
+    const second = manager.shutdown("SIGINT");
+    expect(first).toBe(second);
+    expect(manager.isShuttingDown).toBe(true);
+    expect(() => manager.register("late", () => {})).toThrow(/after shutdown/);
+
+    release();
+    await first;
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it("continues cleanup and exits with failure when a resource rejects", async () => {
+    const exit = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+    const manager = new ShutdownManager();
+    const closeDatabase = vi.fn();
+    manager.register("workers", async () => { throw new Error("Redis failed"); });
+    manager.register("database", closeDatabase);
+
+    await manager.shutdown("SIGTERM");
+
+    expect(closeDatabase).toHaveBeenCalledOnce();
+    expect(exit).toHaveBeenCalledWith(1);
+  });
+
+  it("retains a fatal exit status across repeated shutdown requests", async () => {
+    const manager = new ShutdownManager();
+    const request = manager.shutdown("SIGTERM");
+    const fatal = manager.shutdown("unhandledRejection", 1);
+    expect(fatal).toBe(request);
+
+    await request;
+    expect(process.exitCode).toBe(1);
+  });
+
+  it("forces a nonzero exit after the drain deadline", async () => {
+    vi.useFakeTimers();
+    const exit = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
+    const manager = new ShutdownManager(50);
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    manager.register("stuck worker", () => gate);
+
+    const closing = manager.shutdown("SIGTERM");
+    await vi.advanceTimersByTimeAsync(51);
+    expect(exit).toHaveBeenCalledWith(1);
+
+    release();
+    await closing;
   });
 });

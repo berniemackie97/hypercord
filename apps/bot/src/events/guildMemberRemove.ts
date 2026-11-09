@@ -18,7 +18,7 @@ export async function execute(member: GuildMember | PartialGuildMember) {
       .update(guildMembers)
       .set({
         leftAt: new Date(),
-        updatedAt: new Date(),
+        isActive: false,
       })
       .where(and(eq(guildMembers.userId, user.id), eq(guildMembers.guildId, guild.id)));
   } catch (err) {

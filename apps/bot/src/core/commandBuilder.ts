@@ -1,12 +1,12 @@
-import type { SlashCommandBuilder, ChatInputCommandInteraction } from "discord.js";
-import type { Middleware } from "./middleware.js";
-import { executeMiddleware, errorHandlerMiddleware } from "./middleware.js";
+import type { ChatInputCommandInteraction } from "discord.js";
+import type { CommandDefinition } from "./client.js";
+import { executeMiddleware, errorHandlerMiddleware, type Middleware } from "./middleware.js";
 
 /**
  * Enhanced command interface with middleware support
  */
 export interface EnhancedCommand {
-  data: SlashCommandBuilder;
+  data: CommandDefinition;
   execute: (interaction: ChatInputCommandInteraction) => Promise<void>;
   middlewares?: Middleware[];
 }
@@ -15,11 +15,11 @@ export interface EnhancedCommand {
  * Command builder with fluent API for adding middleware
  */
 export class CommandBuilder {
-  private commandData: SlashCommandBuilder;
+  private commandData: CommandDefinition;
   private handler: (interaction: ChatInputCommandInteraction) => Promise<void>;
   private middlewares: Middleware[] = [];
 
-  constructor(data: SlashCommandBuilder) {
+  constructor(data: CommandDefinition) {
     this.commandData = data;
     this.handler = async () => {
       throw new Error("Command handler not set");
@@ -70,6 +70,6 @@ export class CommandBuilder {
 /**
  * Create a new command builder
  */
-export function createCommand(data: SlashCommandBuilder): CommandBuilder {
+export function createCommand(data: CommandDefinition): CommandBuilder {
   return new CommandBuilder(data);
 }
