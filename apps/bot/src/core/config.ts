@@ -12,6 +12,7 @@ export const envSchema = z.object({
   GUILD_ID: z.string().trim().optional(),
   DATABASE_URL: nonEmpty,
   REDIS_URL: nonEmpty,
+  MESSAGE_CONTENT_ENABLED: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
   OPENAI_API_KEY: z.string().trim().optional(),
   ANTHROPIC_API_KEY: z.string().trim().optional(),
   GEMINI_API_KEY: z.string().trim().optional(),

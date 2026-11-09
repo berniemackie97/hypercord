@@ -15,13 +15,18 @@ export type Command = {
   execute: (i: ChatInputCommandInteraction) => Promise<void>;
 };
 
+const intents = [
+  GatewayIntentBits.Guilds,
+  GatewayIntentBits.GuildMembers,
+  GatewayIntentBits.GuildMessages,
+];
+if (env.MESSAGE_CONTENT_ENABLED) {
+  intents.push(GatewayIntentBits.MessageContent);
+}
+
 export const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMembers, // REQUIRED for guild.members.fetch() in /audit-perms
-    // GatewayIntentBits.GuildMessages, // add if you plan to read/send normal messages frequently
-  ],
-  partials: [Partials.Channel],
+  intents,
+  partials: [Partials.Channel, Partials.Message],
 });
 
 // registry

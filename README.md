@@ -66,6 +66,8 @@ pnpm --filter @hypercord/bot db:migrate
 pnpm dev
 ```
 
+Message-based XP, spam scanning and content caching require explicit `MESSAGE_CONTENT_ENABLED=true` and authorized Message Content intent access. See [Docker deployment and Discord Gateway permissions](DOCKER.md).
+
 ### Docker Setup (Recommended)
 
 ```bash

@@ -1,106 +1,71 @@
 import { z } from "zod";
-import type { ChatInputCommandInteraction, CommandInteractionOptionResolver } from "discord.js";
+import type { ChatInputCommandInteraction } from "discord.js";
 import type { Middleware } from "./middleware.js";
+import { sendPrivateError } from "./interactionError.js";
 
-/**
- * Extract and validate command options using Zod schema
- * @param interaction - Discord interaction
- * @param schema - Zod schema for validation
- * @returns Validated options
- */
-export function validateOptions<T extends z.ZodType>(
-  interaction: ChatInputCommandInteraction,
-  schema: T
-): z.infer<T> {
-  const options = interaction.options as CommandInteractionOptionResolver;
+type Option = {
+  name: string;
+  value?: unknown;
+  options?: readonly Option[];
+};
 
-  // Extract all options into an object
-  const data: Record<string, any> = {};
+const validatedOptions = new WeakMap<ChatInputCommandInteraction, unknown>();
 
-  // Get all option data from the interaction
-  const optionsData = (options as any).data;
-  if (optionsData) {
-    for (const option of optionsData) {
-      data[option.name] = option.value;
-    }
+function collectOptions(options: readonly Option[]): Record<string, unknown> {
+  const result: Record<string, unknown> = Object.create(null);
+  for (const option of options) {
+    result[option.name] = option.options
+      ? collectOptions(option.options)
+      : option.value;
   }
-
-  // Validate with Zod
-  return schema.parse(data);
+  return result;
 }
 
-/**
- * Create a validation middleware
- * @param schema - Zod schema for validation
- * @param onError - Optional custom error handler
- */
+export function validateOptions<T extends z.ZodType>(
+  interaction: ChatInputCommandInteraction,
+  schema: T,
+): z.output<T> {
+  return schema.parse(collectOptions(interaction.options.data));
+}
+
 export function validationMiddleware<T extends z.ZodType>(
   schema: T,
-  onError?: (interaction: ChatInputCommandInteraction, error: z.ZodError) => Promise<void>
+  onError?: (interaction: ChatInputCommandInteraction, error: z.ZodError) => Promise<void>,
 ): Middleware {
   return async (interaction, next) => {
-    try {
-      // Validate options
-      const validated = validateOptions(interaction, schema);
-
-      // Attach validated data to interaction
-      (interaction as any).validatedOptions = validated;
-
-      await next();
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        if (onError) {
-          await onError(interaction, error);
-        } else {
-          // Default error handling
-          const errors = (error.errors || [])
-            .map((e) => `${e.path.join(".")}: ${e.message}`)
-            .join("\n");
-
-          await interaction.reply({
-            content: `❌ **Validation Error:**\n\`\`\`\n${errors || "Invalid input"}\n\`\`\``,
-            ephemeral: true,
-          });
-        }
-        return;
+    const result = schema.safeParse(collectOptions(interaction.options.data));
+    if (!result.success) {
+      if (onError) {
+        await onError(interaction, result.error);
+      } else {
+        const details = result.error.issues.slice(0, 3).map((issue) => {
+          const path = issue.path.join(".");
+          return path ? `${path}: ${issue.message}` : issue.message;
+        }).join("; ");
+        await sendPrivateError(interaction, `Invalid command options: ${details}`);
       }
-      throw error;
+      return;
     }
+
+    validatedOptions.set(interaction, result.data);
+    await next();
   };
 }
 
-/**
- * Common Zod schemas for Discord command options
- */
+export function getValidatedOptions<T>(interaction: ChatInputCommandInteraction): T {
+  const result = validatedOptions.get(interaction);
+  if (result === undefined) {
+    throw new Error("Command options were not validated");
+  }
+  return result as T;
+}
+
 export const schemas = {
-  /** Discord snowflake ID (user, role, channel, etc.) */
   snowflake: z.string().regex(/^\d{17,19}$/, "Invalid Discord ID"),
-
-  /** Duration string (e.g., "10m", "2h", "3d") */
   duration: z.string().regex(/^\d+[smhd]$/, "Invalid duration format (use 10s, 5m, 2h, or 1d)"),
-
-  /** URL */
   url: z.string().url("Invalid URL"),
-
-  /** Hex color code */
-  hexColor: z
-    .string()
-    .regex(/^#[0-9A-Fa-f]{6}$/, "Invalid hex color (use format: #RRGGBB)"),
-
-  /** Positive integer */
+  hexColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Invalid hex color (use format: #RRGGBB)"),
   positiveInt: z.number().int().positive("Must be a positive integer"),
-
-  /** Non-negative integer */
   nonNegativeInt: z.number().int().nonnegative("Must be a non-negative integer"),
-
-  /** Percentage (0-100) */
   percentage: z.number().min(0).max(100, "Must be between 0 and 100"),
 };
-
-/**
- * Helper to get validated options from interaction
- * (Type-safe alternative to direct access)
- */
-export function getValidatedOptions<T>(interaction: ChatInputCommandInteraction): T {
-  return (interaction as any).validatedOptions as T;
-}

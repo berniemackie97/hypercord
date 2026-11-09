@@ -31,6 +31,14 @@ The migration container exits after applying migrations. Re-running `docker comp
 
 The bot image uses a repository-root build context, a frozen pnpm installation, a non-root runtime user, and runtime dependencies only. The bot process starts with `node dist/index.js`. No HTTP listener is currently implemented. No HTTP health endpoint or Docker bot healthcheck is advertised; operational readiness and shutdown guarantees remain open in Issues #14, #15 and #36. Use bot logs and the Discord gateway state to diagnose startup until those issues are completed.
 
+## Discord Gateway permissions
+
+Hypercord always subscribes to Guilds and GuildMessages events. GuildMembers is a privileged intent required by its member lifecycle and permission-audit features. Enable Guild Members on the application's **Bot → Privileged Gateway Intents** page in the Discord Developer Portal before startup.
+
+Full message-content processing is **off by default**. Set `MESSAGE_CONTENT_ENABLED=true` only when the application's Message Content privileged intent has been enabled and, where required, approved by Discord. If the flag is enabled without portal access, Discord can reject the connection with `DisallowedIntents`. With the flag disabled, XP from messages, automated message-content spam scanning, and snipe-content caching are disabled. Guild-message events, AFK metadata, and direct bot mentions remain available; Discord's documented bot-mention exception permits mention content without the broad Message Content intent.
+
+The bot requests message partials and records deletion timestamps for cached message IDs even when their bodies are unavailable; message edits with unavailable old or new content are ignored. Broad message-content storage and retention controls remain outstanding in #33 and #37.
+
 ## Local development
 
 The development override exposes PostgreSQL and Redis only on the loopback interface and runs the bot through `tsx` with a read-only source mount:

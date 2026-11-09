@@ -50,6 +50,13 @@ describe("Environment validation", () => {
     }
   );
 
+  it("opts in to message content only when explicitly enabled", () => {
+    expect(envSchema.parse(valid).MESSAGE_CONTENT_ENABLED).toBe(false);
+    expect(envSchema.parse({ ...valid, MESSAGE_CONTENT_ENABLED: "false" }).MESSAGE_CONTENT_ENABLED).toBe(false);
+    expect(envSchema.parse({ ...valid, MESSAGE_CONTENT_ENABLED: "true" }).MESSAGE_CONTENT_ENABLED).toBe(true);
+    expect(envSchema.safeParse({ ...valid, MESSAGE_CONTENT_ENABLED: "1" }).success).toBe(false);
+  });
+
   it("trims allowlist IDs and ignores empty entries", () => {
     const result = envSchema.parse({
       ...valid,

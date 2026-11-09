@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { z } from "zod";
+import { MessageFlags } from "discord.js";
 import { validateOptions, validationMiddleware, schemas, getValidatedOptions } from "../validation.js";
 
 describe("Validation", () => {
@@ -61,7 +62,8 @@ describe("Validation", () => {
       await middleware(interaction, next);
 
       expect(next).toHaveBeenCalled();
-      expect(interaction.validatedOptions).toEqual({ name: "John" });
+      expect(getValidatedOptions(interaction)).toEqual({ name: "John" });
+      expect(interaction).not.toHaveProperty("validatedOptions");
     });
 
     it("should handle validation errors with default handler", async () => {
@@ -83,8 +85,9 @@ describe("Validation", () => {
 
       expect(next).not.toHaveBeenCalled();
       expect(interaction.reply).toHaveBeenCalledWith({
-        content: expect.stringContaining("Validation Error"),
-        ephemeral: true,
+        content: expect.stringContaining("age:"),
+        flags: MessageFlags.Ephemeral,
+        allowedMentions: { parse: [] },
       });
     });
 
@@ -201,14 +204,33 @@ describe("Validation", () => {
   });
 
   describe("getValidatedOptions", () => {
-    it("should retrieve validated options", () => {
+    it("rejects access before validation", () => {
+      const interaction: any = { options: { data: [] } };
+      expect(() => getValidatedOptions(interaction)).toThrow("not validated");
+    });
+
+    it("does not reuse validation data across interactions", async () => {
+      const middleware = validationMiddleware(z.object({ name: z.string() }));
+      const first: any = { options: { data: [{ name: "name", value: "A" }] } };
+      const second: any = { options: { data: [{ name: "name", value: "B" }] } };
+      await middleware(first, vi.fn());
+      await middleware(second, vi.fn());
+      expect(getValidatedOptions(first)).toEqual({ name: "A" });
+      expect(getValidatedOptions(second)).toEqual({ name: "B" });
+    });
+
+    it("validates nested subcommand option groups", () => {
+      const schema = z.object({
+        admin: z.object({
+          ban: z.object({ user: z.string() }),
+        }),
+      });
       const interaction: any = {
-        validatedOptions: { name: "John", age: 25 },
+        options: { data: [{
+          name: "admin", options: [{ name: "ban", options: [{ name: "user", value: "123" }] }],
+        }] },
       };
-
-      const result = getValidatedOptions(interaction);
-
-      expect(result).toEqual({ name: "John", age: 25 });
+      expect(validateOptions(interaction, schema)).toEqual({ admin: { ban: { user: "123" } } });
     });
   });
 });
