@@ -27,7 +27,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
-    "@discordjs/rest": "^2.3.0",
+    "@discordjs/rest": "^2.6.3",
     "@google/generative-ai": "^0.24.1",
     "bullmq": "^5.8.1",
     "discord-api-types": "^0.38.26",
