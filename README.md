@@ -2,7 +2,7 @@
 
 **The most advanced, feature-rich Discord bot you can self-host.**
 
-[![Tests](https://img.shields.io/badge/tests-123%20passing-success)](./apps/bot/TESTING.md)
+[![CI](https://github.com/berniemackie97/hypercord/actions/workflows/ci.yml/badge.svg)](https://github.com/berniemackie97/hypercord/actions/workflows/ci.yml)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)](./)
 [![Discord.js](https://img.shields.io/badge/discord.js-14.22-5865F2)](./)
 
@@ -18,7 +18,7 @@
 ### 💎 **Enterprise-Grade Features**
 - **25 Database Tables**: Complete data model with Drizzle ORM
 - **36 command modules**: Moderation, economy, leveling, casino, AI, and more
-- **123 passing tests**: Approximately 40% line coverage in the verified CI baseline
+- **passing automated tests**: coverage tracked with a measured CI regression floor below the 80% objective
 - **Multi-tier AI Access**: Guild > Channel > User priority system
 - **Real-time Cost Tracking**: Know exactly what you're spending
 
@@ -166,7 +166,7 @@ hypercord/
 │   │   ├── db/             # Database schema & migrations
 │   │   ├── queue/          # Background jobs (BullMQ)
 │   │   └── utils/          # Utilities and helpers
-│   └── __tests__/          # Test suite (123 tests)
+│   └── __tests__/          # Test suite (automated tests)
 ├── docker-compose.yml      # Production stack
 ├── FEATURES.md             # Complete feature list
 └── README.md               # This file
@@ -178,7 +178,7 @@ hypercord/
 - **Database**: PostgreSQL + Drizzle ORM
 - **Cache/Queue**: Redis + BullMQ
 - **AI**: OpenAI, Anthropic, Google AI SDKs
-- **Testing**: Vitest (123 passing tests; coverage objective not yet met)
+- **Testing**: Vitest (passing automated tests; coverage objective not yet met)
 - **Build**: tsup (ESM, minified)
 
 ## Database Schema
@@ -198,6 +198,7 @@ hypercord/
 ```bash
 # Development
 pnpm dev          # Start with hot reload
+pnpm typecheck    # Typecheck bot, shared package, scripts and tests
 pnpm build        # Production build
 pnpm test         # Run tests
 pnpm test:watch   # Watch mode
@@ -308,7 +309,7 @@ sudo systemctl start hypercord
 
 - **25 database tables** (most comprehensive Discord bot)
 - **36 command modules** in the source catalog
-- **123 tests** passing in the verified CI baseline
+- **automated tests** passing in the verified CI baseline
 - **9 event modules** in the source catalog
 - **4 AI providers** (unprecedented flexibility)
 - **Production bundle** verified against the command and event catalog

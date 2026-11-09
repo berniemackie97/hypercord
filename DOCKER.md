@@ -53,6 +53,7 @@ The root `.env` still uses Compose hostnames. When running the bot directly on t
 
 ```bash
 pnpm install --frozen-lockfile
+pnpm typecheck
 pnpm build
 pnpm lint
 pnpm --filter @hypercord/bot test:coverage

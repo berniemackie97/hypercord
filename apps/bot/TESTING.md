@@ -2,13 +2,13 @@
 
 ## Overview
 
-This project uses [Vitest](https://vitest.dev/) as the testing framework with comprehensive test coverage for all core functionality.
+This project uses [Vitest](https://vitest.dev/) as the testing framework with automated regression tests and coverage reporting.
 
 ## Verified CI baseline
 
 The first executable pnpm CI run on November 9, 2026 passed all 118 tests across 12 suites. Coverage was 39.92% of statements and lines, 32.41% of functions, and 88.26% of branches. Those measurements do not support the previously advertised 100% coverage claim.
 
-The recovery workflow enforces regression floors just below these measured values while [Issue #9](https://github.com/berniemackie97/hypercord/issues/9) tracks the full-source typecheck, broader integration tests, and the 80% coverage objective. The floors are not a declaration of release readiness; refer to the latest CI artifact for current numbers.
+The CI workflow enforces stricter regression floors as coverage increases, and now checks the full TypeScript source, scripts and tests. Meanwhile, [Issue #9](https://github.com/berniemackie97/hypercord/issues/9) tracks broader integration tests, formatting enforcement, and the 80% coverage objective. The floors are not a declaration of release readiness; refer to the latest CI artifact for current numbers.
 
 ## Running Tests
 
@@ -20,7 +20,7 @@ npm test
 npm run test:watch
 
 # Run tests with coverage
-npm run test:coverage
+pnpm --filter @hypercord/bot test:coverage
 
 # Run tests with UI
 npm run test:ui
@@ -314,5 +314,5 @@ testTimeout: 30000, // 30 seconds
 Clear coverage cache:
 ```bash
 rm -rf coverage
-npm run test:coverage
+pnpm --filter @hypercord/bot test:coverage
 ```
