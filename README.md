@@ -2,7 +2,7 @@
 
 **The most advanced, feature-rich Discord bot you can self-host.**
 
-[![Tests](https://img.shields.io/badge/tests-118%20passing-success)](./apps/bot/TESTING.md)
+[![Tests](https://img.shields.io/badge/tests-123%20passing-success)](./apps/bot/TESTING.md)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)](./)
 [![Discord.js](https://img.shields.io/badge/discord.js-14.22-5865F2)](./)
 
@@ -164,7 +164,7 @@ hypercord/
 │   │   ├── db/             # Database schema & migrations
 │   │   ├── queue/          # Background jobs (BullMQ)
 │   │   └── utils/          # Utilities and helpers
-│   └── __tests__/          # Test suite (118 tests)
+│   └── __tests__/          # Test suite (123 tests)
 ├── docker-compose.yml      # Production stack
 ├── FEATURES.md             # Complete feature list
 └── README.md               # This file
