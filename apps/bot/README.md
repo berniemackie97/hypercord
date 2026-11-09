@@ -23,7 +23,7 @@ A hyper-advanced, enterprise-grade Discord bot framework built with TypeScript, 
 
 ### 🧪 Testing & Quality
 - **Vitest** - Fast unit and integration testing
-- **Code Coverage** - 80%+ coverage threshold
+- **Code Coverage** - Measured CI regression baseline (~40% lines); 80% objective tracked in issue #9
 - **CI/CD** - Automated testing and deployment
 - **Linting** - ESLint with TypeScript support
 - **Formatting** - Prettier for consistent code style
@@ -56,7 +56,7 @@ cp .env.example .env
 docker compose up -d
 
 # Run database migrations
-npm run db:migrate
+pnpm --filter @hypercord/bot db:migrate
 
 # Register commands
 npm run register
@@ -254,9 +254,11 @@ ADMIN_ROLE_IDS=111111111,222222222
 
 ## Docker Deployment
 
+Run the following from the repository root after configuring `.env` (see [DOCKER.md](../../DOCKER.md)).
+
 ```bash
 # Build image
-docker build -t hypercord-bot .
+docker build --file apps/bot/Dockerfile --target production -t hypercord-bot .
 
 # Run with docker-compose
 docker compose up -d
@@ -276,7 +278,7 @@ The project includes a comprehensive CI/CD pipeline:
 - ✅ Type checking with TypeScript
 - ✅ Unit & integration tests
 - ✅ Code coverage reporting
-- ✅ Automatic PR comments with coverage diff
+- Coverage reports retained as GitHub Actions artifacts
 - ✅ PostgreSQL & Redis test services
 
 ## Testing
