@@ -1,0 +1,31 @@
+name: Engineering task
+description: Track reliability, security, architecture or release work
+title: "Engineering: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Current evidence and gap
+      description: Link to an implementation, failed check, operational metric or review finding.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Required outcome
+      description: Describe exactly what must be true after this work.
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification and regression coverage
+      description: Include the tests, CI evidence or deployment proof required to close.
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies, rollout and rollback
+      description: Name blocked work and deployment or migration sequencing.
