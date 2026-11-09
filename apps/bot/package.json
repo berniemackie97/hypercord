@@ -22,7 +22,8 @@
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
     "format": "prettier --check .",
-    "format:write": "prettier --write ."
+    "format:write": "prettier --write .",
+    "typecheck": "tsc --noEmit --project tsconfig.typecheck.json"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
