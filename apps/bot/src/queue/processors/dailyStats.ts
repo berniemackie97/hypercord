@@ -26,7 +26,7 @@ export async function aggregateDailyStats(job: Job<{ date: string }>): Promise<v
   const commandsFailed = Number(counts[0]?.failed ?? 0);
   await db.insert(dailyStats).values({
     id: nanoid(),
-    date: start,
+    date: job.data.date,
     commandsExecuted,
     commandsFailed,
     guildsActive: activeGuilds.length,

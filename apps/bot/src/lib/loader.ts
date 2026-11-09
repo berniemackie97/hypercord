@@ -19,7 +19,7 @@ export async function loadCommands(): Promise<void> {
   log.info({ count: commands.size }, "commands loaded");
 }
 
-export async function loadEvents(client: Client): Promise<void> {
+export async function loadEvents(client: Pick<Client, "on" | "once">): Promise<void> {
   const names = new Set<string>();
 
   for (const event of eventModules) {

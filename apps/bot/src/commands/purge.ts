@@ -2,7 +2,7 @@ import {
   SlashCommandBuilder,
   PermissionFlagsBits,
   EmbedBuilder,
-  type TextChannel,
+  TextChannel,
 } from "discord.js";
 import { z } from "zod";
 import { createCommand } from "../core/commandBuilder.js";
