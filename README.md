@@ -18,7 +18,7 @@
 ### 💎 **Enterprise-Grade Features**
 - **25 Database Tables**: Complete data model with Drizzle ORM
 - **36 command modules**: Moderation, economy, leveling, casino, AI, and more
-- **passing automated tests**: coverage tracked with a measured CI regression floor below the 80% objective
+- **Automated tests**: CI verifies the suite; coverage uses measured regression floors below the 80% objective
 - **Multi-tier AI Access**: Guild > Channel > User priority system
 - **Real-time Cost Tracking**: Know exactly what you're spending
 
@@ -166,7 +166,7 @@ hypercord/
 │   │   ├── db/             # Database schema & migrations
 │   │   ├── queue/          # Background jobs (BullMQ)
 │   │   └── utils/          # Utilities and helpers
-│   └── __tests__/          # Test suite (automated tests)
+│   └── __tests__/          # Automated regression tests
 ├── docker-compose.yml      # Production stack
 ├── FEATURES.md             # Complete feature list
 └── README.md               # This file
@@ -178,7 +178,7 @@ hypercord/
 - **Database**: PostgreSQL + Drizzle ORM
 - **Cache/Queue**: Redis + BullMQ
 - **AI**: OpenAI, Anthropic, Google AI SDKs
-- **Testing**: Vitest (passing automated tests; coverage objective not yet met)
+- **Testing**: Vitest; current results and coverage are published in CI
 - **Build**: tsup (ESM, minified)
 
 ## Database Schema
@@ -309,7 +309,7 @@ sudo systemctl start hypercord
 
 - **25 database tables** (most comprehensive Discord bot)
 - **36 command modules** in the source catalog
-- **automated tests** passing in the verified CI baseline
+- **Automated tests** verified in CI (see workflow runs for counts and coverage)
 - **9 event modules** in the source catalog
 - **4 AI providers** (unprecedented flexibility)
 - **Production bundle** verified against the command and event catalog
