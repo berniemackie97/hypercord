@@ -57,4 +57,5 @@ CI checks the packaged command and event catalog, runs migrations twice against 
 - Run one bot replica until Discord sharding, worker ownership and idempotent job processing have been verified.
 - Use `docker compose logs bot` and `docker compose logs migrate` to investigate failures; never print environment variables containing secrets.
 - PostgreSQL data lives in `postgres_data` and Redis AOF data in `redis_data`. `docker compose down -v` **destroys** both volumes.
-- Stop the stack with `docker compose down`; backup/restore, queue drain, and health monitoring remain separately tracked work.
+- On SIGTERM or SIGINT, the bot waits for in-flight BullMQ workers to finish before closing queues, Redis, the Discord client and PostgreSQL. The application has a 25-second shutdown deadline; Compose allows 30 seconds before a forced stop. Failed cleanup produces a nonzero exit status. Delivery guarantees and interrupted-job reconciliation are tracked separately.
+- Stop the stack with `docker compose down`; backup/restore and health monitoring remain separately tracked work.

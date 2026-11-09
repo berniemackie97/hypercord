@@ -1,85 +1,84 @@
 import { log } from "./logger.js";
-import { client } from "./client.js";
-import { rateLimiter } from "./rateLimiter.js";
 
-/**
- * Shutdown handler type
- */
-type ShutdownHandler = () => Promise<void> | void;
+type CloseHandler = () => Promise<void> | void;
 
-/**
- * Shutdown manager for graceful cleanup
- */
-class ShutdownManager {
-  private handlers: ShutdownHandler[] = [];
-  private isShuttingDown = false;
+export class ShutdownManager {
+  private readonly handlers: { name: string; close: CloseHandler }[] = [];
+  private running?: Promise<void>;
 
-  /**
-   * Register a shutdown handler
-   * @param handler - Function to call on shutdown
-   */
-  register(handler: ShutdownHandler): void {
-    this.handlers.push(handler);
+  constructor(private readonly deadlineMs = 25000) {}
+
+  get isShuttingDown(): boolean {
+    return this.running !== undefined;
   }
 
-  /**
-   * Execute all shutdown handlers
-   */
-  async shutdown(signal: string): Promise<void> {
-    if (this.isShuttingDown) {
-      log.warn("shutdown already in progress");
-      return;
+  register(name: string, close: CloseHandler): void {
+    if (this.running) {
+      throw new Error("Cannot register resources after shutdown has started");
     }
+    this.handlers.push({ name, close });
+  }
 
-    this.isShuttingDown = true;
-    log.info({ signal }, "received shutdown signal");
+  shutdown(reason: string, exitCode = 0): Promise<void> {
+    if (exitCode !== 0) {
+      process.exitCode = 1;
+    }
+    if (!this.running) {
+      this.running = Promise.resolve().then(() => this.run(reason));
+    }
+    return this.running;
+  }
 
-    // Execute all registered handlers
-    for (const handler of this.handlers) {
-      try {
-        await handler();
-      } catch (error) {
-        log.error({ error }, "shutdown handler failed");
+  private async run(reason: string): Promise<void> {
+    log.info({ reason }, "shutting down");
+    const deadline = setTimeout(() => {
+      log.fatal({ reason, deadlineMs: this.deadlineMs }, "shutdown deadline exceeded");
+      process.exit(1);
+    }, this.deadlineMs);
+    deadline.unref();
+
+    let failed = false;
+    try {
+      for (const { name, close } of this.handlers) {
+        try {
+          await close();
+        } catch (error) {
+          failed = true;
+          log.error({ error, resource: name }, "resource cleanup failed");
+        }
       }
+    } finally {
+      clearTimeout(deadline);
     }
 
-    log.info("shutdown complete");
-    process.exit(0);
+    if (failed) {
+      log.fatal("shutdown finished with resource failures");
+      process.exit(1);
+    }
+    log.info("shutdown finished");
   }
 }
 
 export const shutdownManager = new ShutdownManager();
 
-/**
- * Setup graceful shutdown handlers
- */
+let signalsRegistered = false;
+
 export function setupShutdown(): void {
-  // Register core shutdown handlers
-  shutdownManager.register(async () => {
-    log.info("destroying Discord client");
-    client.destroy();
+  if (signalsRegistered) return;
+  signalsRegistered = true;
+
+  process.on("SIGTERM", () => {
+    void shutdownManager.shutdown("SIGTERM");
   });
-
-  shutdownManager.register(async () => {
-    log.info("cleaning up rate limiter");
-    rateLimiter.destroy();
+  process.on("SIGINT", () => {
+    void shutdownManager.shutdown("SIGINT");
   });
-
-  // Handle shutdown signals
-  process.on("SIGTERM", () => shutdownManager.shutdown("SIGTERM"));
-  process.on("SIGINT", () => shutdownManager.shutdown("SIGINT"));
-
-  // Handle uncaught exceptions
   process.on("uncaughtException", (error) => {
     log.fatal({ error }, "uncaught exception");
-    shutdownManager.shutdown("uncaughtException");
+    void shutdownManager.shutdown("uncaughtException", 1);
   });
-
-  // Handle unhandled promise rejections
-  process.on("unhandledRejection", (reason, promise) => {
-    log.fatal({ reason, promise }, "unhandled promise rejection");
-    shutdownManager.shutdown("unhandledRejection");
+  process.on("unhandledRejection", (reason) => {
+    log.fatal({ reason }, "unhandled rejection");
+    void shutdownManager.shutdown("unhandledRejection", 1);
   });
-
-  log.info("shutdown handlers registered");
 }

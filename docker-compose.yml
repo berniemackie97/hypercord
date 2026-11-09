@@ -47,6 +47,7 @@ services:
       dockerfile: apps/bot/Dockerfile
       target: production
     restart: unless-stopped
+    stop_grace_period: 30s
     depends_on:
       postgres:
         condition: service_healthy
