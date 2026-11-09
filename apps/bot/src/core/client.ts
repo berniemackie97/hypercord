@@ -4,10 +4,11 @@ import {
   Partials,
   Collection,
   REST,
+  type SlashCommandBuilder,
+  type ChatInputCommandInteraction,
 } from "discord.js";
 import { log } from "./logger.js";
 import { env } from "./config.js";
-import type { SlashCommandBuilder, ChatInputCommandInteraction } from "discord.js";
 
 export type Command = {
   data: SlashCommandBuilder;
