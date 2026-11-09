@@ -1,7 +1,7 @@
 import { Events, type Message, PermissionFlagsBits, EmbedBuilder } from "discord.js";
 import { log } from "../core/logger.js";
 import { env } from "../core/config.js";
-import { hasRequiredAiRole } from "./aiRole.js";
+import { hasRequiredAiRole } from "../core/aiRole.js";
 import { getGuildConfig } from "../core/guildConfig.js";
 import { createAuditLog } from "../core/audit.js";
 import { addXP, calculateMessageXP } from "../utils/leveling.js";
