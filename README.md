@@ -18,7 +18,7 @@
 ### 💎 **Enterprise-Grade Features**
 - **25 Database Tables**: Complete data model with Drizzle ORM
 - **36 command modules**: Moderation, economy, leveling, casino, AI, and more
-- **118 passing tests**: Approximately 40% line coverage in the verified CI baseline
+- **123 passing tests**: Approximately 40% line coverage in the verified CI baseline
 - **Multi-tier AI Access**: Guild > Channel > User priority system
 - **Real-time Cost Tracking**: Know exactly what you're spending
 
@@ -176,7 +176,7 @@ hypercord/
 - **Database**: PostgreSQL + Drizzle ORM
 - **Cache/Queue**: Redis + BullMQ
 - **AI**: OpenAI, Anthropic, Google AI SDKs
-- **Testing**: Vitest (118 passing tests; coverage objective not yet met)
+- **Testing**: Vitest (123 passing tests; coverage objective not yet met)
 - **Build**: tsup (ESM, minified)
 
 ## Database Schema
@@ -306,7 +306,7 @@ sudo systemctl start hypercord
 
 - **25 database tables** (most comprehensive Discord bot)
 - **36 command modules** in the source catalog
-- **118 tests** passing in the verified CI baseline
+- **123 tests** passing in the verified CI baseline
 - **9 event modules** in the source catalog
 - **4 AI providers** (unprecedented flexibility)
 - **Production bundle** verified against the command and event catalog
